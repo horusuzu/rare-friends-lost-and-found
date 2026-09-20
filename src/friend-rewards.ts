@@ -1,5 +1,5 @@
 import { isAddress, parseAbi, zeroAddress, type Address } from 'viem';
-import { readGenerationEligibility, type GenerationIdentityClient } from './identity.js';
+import { readGenerationEligibility, readGenesisEligibility, type GenerationIdentityClient } from './identity.js';
 import { GENERATION_SPRITE_MANIFEST } from './generation-sprites.js';
 import type { FriendRewardsSnapshot, NFTRewardAmounts } from './game.js';
 
@@ -16,18 +16,19 @@ const MANAGER_ABI = parseAbi(['function positions(address,uint256) view returns 
 const TOKEN_ABI = parseAbi(['function balanceOf(address) view returns (uint256)']);
 const same = (a:string,b:string) => a.toLowerCase()===b.toLowerCase();
 /** Trusted host only. A save, image, or simulated balance never supplies these amounts. */
-export async function readFriendRewards(client:GenerationIdentityClient, options:{friendId:bigint;account:Address;walletAddress:Address;genesisId?:bigint}):Promise<FriendRewardsSnapshot> {
- const identity=await readGenerationEligibility(client,options.friendId,options.account);
+export async function readFriendRewards(client:GenerationIdentityClient, options:{friendId:bigint;account:Address;walletAddress:Address;genesisId?:bigint;collection?:'genesis'|'generations'}):Promise<FriendRewardsSnapshot> {
+ const isGenesis=options.collection==='genesis';
+ const identity=await (isGenesis?readGenesisEligibility:readGenerationEligibility)(client,options.friendId,options.account);
  if(!identity.eligible)throw new Error('The selected Friend is no longer eligible.');
  const blockNumber=identity.blockNumber;
- const own = await readAmounts(client, GENERATION_SPRITE_MANIFEST.generations, options.friendId, blockNumber, options.walletAddress);
+ const own = await readAmounts(client, isGenesis?REWARDS_DEPLOYMENT.genesis:GENERATION_SPRITE_MANIFEST.generations, options.friendId, blockNumber, options.walletAddress);
  let genesis: FriendRewardsSnapshot['genesis'];
- if(options.genesisId !== undefined) {
+ if(!isGenesis && options.genesisId !== undefined) {
   if(options.genesisId<1n || options.genesisId >= 1n<<256n)throw new Error('Invalid Genesis ID.');
   const owner=await client.readContract({address:REWARDS_DEPLOYMENT.genesis,abi:NFT_ABI,functionName:'ownerOf',args:[options.genesisId],blockNumber});
   if(same(owner,options.account)) genesis={...await readAmounts(client,REWARDS_DEPLOYMENT.genesis,options.genesisId,blockNumber),tokenId:options.genesisId};
  }
- return {...own,friendId:options.friendId,...(genesis?{genesis}: {})};
+ return {...own,friendId:options.friendId,...(isGenesis?{collection:"genesis" as const}:{}),...(genesis?{genesis}: {})};
 }
 async function readAmounts(client:GenerationIdentityClient,collection:Address,tokenId:bigint,blockNumber:bigint,expectedWallet?:Address):Promise<NFTRewardAmounts> {
  const [wallet,manager]=await Promise.all([

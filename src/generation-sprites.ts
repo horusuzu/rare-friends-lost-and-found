@@ -33,8 +33,9 @@ export type SpriteFrame = Readonly<{ bitmap: bigint; rows: readonly string[] }>;
 type SpriteClips = Readonly<Record<SpriteFacing, readonly SpriteFrame[]>>;
 export type GenerationSprites = Readonly<{
   tokenId: bigint;
+  collection?: "generations" | "genesis";
   familyId: number;
-  familyName: typeof GENERATION_FAMILY_NAMES[number];
+  familyName: typeof GENERATION_FAMILY_NAMES[number] | "Genesis";
   seed: number;
   frames: readonly bigint[];
   clips: Readonly<{ idle: SpriteClips; walk: SpriteClips }>;

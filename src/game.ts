@@ -16,7 +16,7 @@ export type NFTRewardAmounts = Readonly<{
   blockNumber: bigint; checkedAt: number; walletAddress: string;
   active: boolean; claimableRF: bigint; claimableWETH: bigint; walletRF: bigint; walletWETH: bigint;
 }>;
-export type FriendRewardsSnapshot = NFTRewardAmounts & Readonly<{ friendId: bigint; genesis?: NFTRewardAmounts & Readonly<{tokenId: bigint}> }>;
+export type FriendRewardsSnapshot = NFTRewardAmounts & Readonly<{ friendId: bigint; collection?: "genesis" | "generations"; genesis?: NFTRewardAmounts & Readonly<{tokenId: bigint}> }>;
 
 /** Player actions; randomness and funding are provided separately by the platform. */
 export type GameClient = Readonly<{
