@@ -1,6 +1,12 @@
 {
-  "name": "Lost & Found · Rare Friends",
-  "consumable": "Gold-foil stamp (session cosmetic)",
+  "name": "Our Little Island · Rare Friends",
+  "consumable": "Gold room frame (session cosmetic)",
   "price": "2000000000000000000",
-  "outcomes": [{ "name": "Unused SDK schema placeholder", "chanceBps": 10000, "reward": "1" }]
+  "outcomes": [
+    {
+      "name": "Unused SDK schema placeholder",
+      "chanceBps": 10000,
+      "reward": "1"
+    }
+  ]
 }

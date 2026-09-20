@@ -1,21 +1,35 @@
-# Rare Friends: Lost & Found
+# Rare Friends: Our Little Island / 島ぐらし
 
-A 90-second delivery adventure. Your verified Generations NFT brings a lost object home, then makes a keepsake postcard. Genesis #597 is the fictional post-office founder, using its authentic on-chain portrait with the holder's permission.
+A phone-first companion and island-building game. Your verified Generations NFT lives with you: choose food, take walks, make choices on outings, bring materials and postcards home, and build a small island together. This replaces the former 90-second delivery prototype after its holder playtest.
 
-Work in progress. Purchases are simulated. Public builds keep the FriendSDK ownership gate.
+## Play loop
 
-## Run
+- Name your Friend. Each NFT has a stable favorite food; favorites earn more friendship.
+- Feed, walk, talk, or sleep. Sleep advances the game one day and restores energy. No real-time wait or neglect penalty.
+- Visit the shore, woods, or bakery plaza. Two choices per location give different materials and friendship; return home to bank them and keep a postcard.
+- Build a flower garden, a bridge to the fourth destination, or a shared bench. Flowers grow after sleep and appear in the room; the bench improves walks.
+- Eight collectible postcards, a bounded journal, friendship stages and contextual greetings retain memories of the actual selected Friend.
 
-Node 22+: `npm ci`, `npm run build`, then `node scripts/dev-game.mjs dev games/lost-and-found` from the repository root. Requires a browser wallet holding a hardwired Generations NFT (generation >= 1) on Robinhood mainnet (4663). Genesis alone is not an eligible playable Friend. No signatures or RF funding are required.
+## Run and build
+
+Node 22+: `npm ci`, `npm run build`, then `node scripts/dev-game.mjs dev games/lost-and-found` for development. For public home-screen packaging: `node scripts/build-island-life.mjs /path/to/NEW-empty-directory`. Use a new dedicated output directory each build (the PWA packager adds nonstandard files after the SDK build).
+
+Requires a browser wallet holding a Generations NFT of generation >= 1 on Robinhood mainnet (4663). Genesis alone is not eligible. Ownership is freshly verified by the SDK; no signatures or real RF funding are needed. The opaque iframe sandbox remains intact.
+
+## Persistence and mobile
+
+Preview state is saved through a bounded host bridge to this browser's localStorage, scoped to the trusted game URL, verified NFT and canonical wallet. Local saves do not prove ownership. Switching identities closes the bridge. Failed saves visibly block further changes until retry. Corrupted saves are retained until the player explicitly starts a new life. This is local, editable preview data, not cloud storage or on-chain assets.
+
+The public build includes a standalone web-app manifest, icons and a scope-limited, network-first shell cache. Add it through the browser's Home Screen / Install menu. Ownership still requires an online RPC and an injected wallet; an installed browser context without a compatible wallet cannot play. Use the wallet-enabled browser in that case. No WalletConnect, mobile wallet relay or cross-device synchronization is implemented. Browser/app storage partitions can differ; no automatic migration is promised.
 
 ## Economy
 
-All three deliveries are free. A 2 demo RF SDK `buy(1n)` unlocks the gold-foil postcard style for the current runtime session. One purchase only, no gameplay advantage. The unconsumed SDK inventory item represents this session unlock. No `play`, `settle`, or `redeem` actions are exposed. The positive one-wei prize in game.json is an unused schema requirement, not a promised reward. No live spending, burn, financial yield, NFT minting, persistent storage, or creator fees are implemented. Reloading resets progress and the preview ledger.
+Core care, materials, construction and memory collection are free simulated progression. Optional gold room-frame styling integrates the SDK's `buy(1n)` with a 2 demo RF session cosmetic. It never modifies growth, friendship, materials or saves. The runtime simulated ledger resets on reload; the purchased unconsumed item represents that session's cosmetic entitlement. No play/settle/redeem actions, RF payouts, real spending, minting or creator fees. `game.json`'s positive one-wei reward is an unused SDK schema requirement, not a promised reward. Production inventory/cosmetics require a future integration reviewed with the Rare Friends team.
 
-## Rules
+## Validation and assets
 
-90 real active seconds per delivery. Moving along a connected street costs an additional 2.5 seconds. Wrong-address attempts cost 8 seconds. The optional plaza shortcut reaches the lighthouse on a timing hit (35–65% of the meter); misses cost 6 seconds. Time stops when the SDK pauses, settings open, or the tab is hidden. Two or more wrong addresses award one star; less than 30 seconds left or one wrong address awards two; otherwise three. Stars have no monetary value.
+`node --test games/lost-and-found/life.test.mjs games/lost-and-found/pwa.test.mjs`
+`node games/lost-and-found/life-browser.test.mjs`
+`npx tsc -p games/lost-and-found/tsconfig.json`
 
-## Assets
-
-Original town SVG, UI and story by this project. Selected playable NFT artwork is read with the SDK's canonical sprite reader, not a test substitute. Genesis #597 SVG fetched on 2026-09-21 using `tokenURI(597)` from official Genesis contract `0x116EaA62241751E0c98dA43d458600c6C17cD361` on Robinhood mainnet. See upstream NOTICE.md for artwork terms and LICENSE for FriendSDK code. Audio uses the SDK's procedural sound kit.
+Original room, scenery, app icon and stories. Canonical selected NFT sprites from FriendSDK. Existing delivery model/artwork remain reference files but are not the active experience. FriendSDK code: LICENSE. Artwork: NOTICE.md. No third-party game characters, logos or proprietary assets are used.

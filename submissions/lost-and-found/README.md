@@ -1,56 +1,39 @@
-# Rare Friends: Lost & Found
+# Rare Friends: Our Little Island
 
-**Every Friend has something worth bringing home.**
+**A Friend to come home to. An island you grow together.**
 
-Submission prepared; real connected-wallet playtest in progress before filing.
+Draft — not yet filed. The first delivery prototype passed a holder playtest technically, but failed its emotional goal. This revision replaces it with ongoing care and island life; a second holder playtest is pending.
 
-- **Builder:** Genesis #597 holder / GitHub @horusuzu
-- **Category:** Character Spotlight (primary); Economy Potential (secondary relevance)
-- **Stack:** FriendSDK v0.1.2, React 19, TypeScript, original SVG map, Canvas postcard renderer.
-- **Public playable preview:** https://horusuzu.github.io/rare-friends-lost-and-found/
-- **Source:** https://github.com/horusuzu/rare-friends-lost-and-found — game directory `games/lost-and-found`.
+- Builder: Genesis #597 holder / GitHub @horusuzu
+- Focus: Character Spotlight
+- Stack: FriendSDK v0.1.2, React, TypeScript, original SVG and Canvas art, installable web-app metadata.
+- Public preview: https://horusuzu.github.io/rare-friends-lost-and-found/
+- Source: https://github.com/horusuzu/rare-friends-lost-and-found (`games/lost-and-found`)
 
-## Screenshots
+## The experience
 
-![Lost & Found desk](https://raw.githubusercontent.com/horusuzu/rare-friends-lost-and-found/feat/lost-and-found/artifacts/desk-1100.png)
+Your own verified Generations NFT becomes a companion. Give it a name, discover its favorite food, go for walks, and choose how to spend time at the beach, forest, bakery plaza or lighthouse. Each outing offers two choices with different materials and friendship gains. Bring home a personal postcard, grow flowers, build a shared bench, and construct a bridge to reach the lighthouse.
 
-Automated-test screenshot with fixture Friend #7730; the founder portrait is Genesis #597.
-
-## What did you build?
-
-A 90-second delivery adventure in which your own verified Generations NFT returns a lost object to its owner and makes a personalised postcard of the journey. Three short stories unfold around a music box, old seeds and a red scarf. Genesis #597, owned by the builder, is the fictional founder of the post office.
-
-As a Genesis holder, I wanted Friends to have memories with their owners. This project makes the NFT the person doing something kind: carrying the parcel, choosing the route, reaching the destination and appearing on the keepsake. The town and its stories are original fiction, not official Rare Friends lore.
+The room changes as you live together. The Friend remembers previous outings in its greeting; its journal and eight collectible postcards record your choices. Sleeping advances the game to the next morning and grows the garden. No countdown or neglect penalty demands attention. Stories and scenery are original fiction, not official Rare Friends lore.
 
 ## Try it
 
-1. Connect a browser wallet on Robinhood mainnet (4663), holding a hardwired Generations NFT, generation 1 or higher. Select your Friend using the SDK. Genesis alone does not satisfy this requirement.
-2. Choose one of three parcels and read the owner's clue. Press **Take this delivery**.
-3. Tap connected map stops or choose the route buttons. Keyboard: Tab and Enter. Press **Deliver here** at the address you infer from the clue.
-4. On success, make a postcard. Long-press/right-click the PNG or take a screenshot. Sharing is manual; no NFT is minted.
+Connect a compatible browser wallet holding a Generations NFT (generation >=1) on Robinhood mainnet, chain 4663. Select your Friend in the SDK. Genesis alone is insufficient. No signatures or funds are needed.
 
-All purchases are simulated. Connecting reads ownership; this preview needs no RF funding, private key, or transaction signature.
+The interface is Japanese-first: おうち = Home, おでかけ = Outings, 島づくり = Build, 思い出 = Memories. On Home, choose ごはん to feed or おやすみ to advance a day. Visit the shore, pick a choice, and return home with materials. Build 小さな花畑 (garden), sleep, and pick the flowers; build 灯台への橋 (bridge) to unlock the fourth destination. Settings lets you rename the Friend.
 
-## Controls and rules
+## Persistence and mobile
 
-90 active seconds per delivery. Every connected-street move costs an additional 2.5 seconds. Wrong addresses cost 8 seconds. The optional wind shortcut from the square to the lighthouse succeeds when the marker is between 35% and 65%; a miss costs 6 seconds. It never wagers RF. Settings, SDK menus and hidden tabs pause the clock. Basic streets remain available as the alternative to the timing challenge.
+Bounded local saves cross the opaque iframe through an explicit preview-only SDK bridge. The trusted host chooses a game/NFT/canonical-wallet namespace; child code cannot select another key. Fresh ownership verification remains mandatory at each session. Saves never grant ownership or real assets. Storage errors remain visible and retryable.
 
-Ratings: two or more wrong addresses = 1 star; one wrong address or fewer than 30 seconds remaining = 2 stars; otherwise 3 stars. Stars have no financial value. Timing and stars do not depend on purchases.
+Add the public page to the home screen through a supported browser. The shell cache excludes external RPC, POST requests and wallet data. This is not a native-store release or a guarantee of offline play: an injected wallet and online ownership reads remain required. Installed contexts without a wallet must use the wallet-enabled browser. Local data does not automatically transfer between browsers or devices.
 
-## Exact economy
+## Economy and limits
 
-All deliveries and standard postcards are free. A **2 simulated RF** purchase unlocks the gold-foil postcard stamp for the runtime session. This uses `client.buy(1n)` through the official confirmation UI; one retained inventory item represents the cosmetic unlock. The game prevents repeat purchases while unlocked. It exposes no play, settlement or redemption action.
+Care, materials, building and postcards are free simulated progression. The optional gold room frame costs 2 demo RF through SDK `buy(1n)`, grants no progression advantage, and lasts only for the runtime session. Repeat cosmetic purchases are disabled once owned. Reload resets the simulated RF ledger and cosmetic, while local care saves remain. The unused one-wei reward in game.json is a schema placeholder, not a payout. No play/settle/redeem actions, real spending, financial return, minting or creator fees.
 
-The one-wei positive reward in `game.json` is an unused SDK schema placeholder, not a game prize or promised payout. There is no live RF spending or burn, no creator fee, and no claim that a simulated purchase counts as real Token Activity. Purchases, progress and collected-delivery indicators reset with the preview session.
+Production cosmetics/inventory would need a separately reviewed RF integration. There is no cloud sync, multiplayer, automatic posting, mobile wallet relay, measured retention or claim of real token activity.
 
-Future RF integration would offer clearly priced cosmetic themes and community-authored special deliveries. Contract allocation, burns and any creator economics would require a later reviewed integration. They are not implemented or presented as current protocol behaviour.
+## Run, checks and credits
 
-## Checks and limitations
-
-See `games/lost-and-found/VALIDATION.md` for exact results. Automated browser checks use the SDK's read-only fixture Friend #7730 at desktop and phone sizes. No mock identity is shipped. Actual connected-wallet play is pending the builder's eligible Generations NFT confirmation; screenshots do not prove this check has happened.
-
-The first version is single-player. Recipients are fictional town characters associated with houses, not other wallets or claimed player NFTs. There are no shared rooms, live messages, automatic social posting, cloud saves or return-visit analytics. Saved postcards are PNG keepsakes, not transferable NFT assets. Browser image saving varies by device; screenshot capture is the fallback.
-
-## Credits
-
-FriendSDK code: upstream Apache-2.0; artwork terms: upstream `NOTICE.md`. Genesis #597 image: official Genesis contract `0x116EaA62241751E0c98dA43d458600c6C17cD361`, `tokenURI(597)`, fetched September 21, 2026. Playable sprites: canonical SDK reader for the selected NFT. Town illustrations, writing, game logic and postcard layouts: this project. Sounds: SDK procedural sound kit. Built with Codex.
+See `games/lost-and-found/README.md` for build instructions and `VALIDATION.md` for evidence and limitations. Automated tests use SDK fixture #7730; no mock wallet or identity bypass is shipped. FriendSDK is Apache-2.0; canonical artwork follows NOTICE.md. Room, island scenery, stories and app icon are original. Built with Codex.

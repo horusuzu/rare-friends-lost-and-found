@@ -27,6 +27,23 @@ for(const width of [390,1100]) console.log(await testGame('./games/lost-and-foun
   await game.getByText('保存済み',{exact:true}).waitFor();
   const saved=await page.evaluate(()=>Object.entries(localStorage).find(([key])=>key.includes('preview')));
   assert.ok(saved,'Host has durable save'); assert.match(saved[1],/flowers/);
+  await game.getByRole('button',{name:'設定',exact:true}).click();
+  await game.getByRole('button',{name:'金色の額縁 · 2 demo RF',exact:true}).click();
+  await page.getByRole('button',{name:'Cancel',exact:true}).click();
+  await game.getByRole('button',{name:'金色の額縁 · 2 demo RF',exact:true}).click();
+  await page.getByRole('button',{name:/Confirm/i}).click();
+  await game.getByRole('button',{name:'金色の額縁を使用中',exact:true}).waitFor();
+  assert.equal(await game.locator('.gold-frame').count(),1);
+  await game.getByLabel('Friendの呼び名').fill('そら');
+  await game.getByRole('button',{name:'この名前で呼ぶ'}).click();
+  await game.getByText('保存済み',{exact:true}).waitFor();
+  await page.reload();
+  await page.getByRole('button',{name:/^Connect (wallet|Browser wallet)$/}).click();
+  await page.getByRole('button',{name:/^Friend #7730\b/}).click();
+  await game.getByRole('heading',{name:'そらと、島ぐらし。'}).waitFor();
+  await game.getByText('2日目',{exact:true}).waitFor();
+  await game.getByText('保存済み',{exact:true}).waitFor();
+  assert.equal(await game.locator('.gold-frame').count(),0,'Cosmetic resets independently of care save');
   assert.equal(await game.locator('.life-app').evaluate(el=>el.scrollWidth>el.clientWidth+1),false);
  }
 }));

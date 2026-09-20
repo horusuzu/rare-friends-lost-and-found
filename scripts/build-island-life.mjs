@@ -1,0 +1,13 @@
+import { buildGame } from './dev-game.mjs';
+import { readFile, writeFile, cp, mkdir } from 'node:fs/promises';
+import path from 'node:path';
+const directory = path.resolve('games/lost-and-found');
+if (!process.argv[2]) throw new Error('Pass a new empty output directory for this release.');
+const outdir = path.resolve(process.argv[2]);
+await buildGame(directory, { outdir });
+await cp(path.join(directory, 'pwa'), outdir, { recursive: true });
+const index = await readFile(path.join(outdir, 'index.html'), 'utf8');
+await writeFile(path.join(outdir, 'index.html'), index.replace('<html lang="en">','<html lang="ja">').replace('</head>', '<link rel="manifest" href="./manifest.webmanifest"><meta name="theme-color" content="#658c70"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="apple-touch-icon" href="./icon-192.png"></head>').replace('</body>', '<script src="./install.js"></script></body>'));
+await mkdir(path.join(outdir, 'assets'), { recursive: true });
+for (const file of ['LICENSE','NOTICE.md','assets/provenance.json','assets/sound-provenance.json']) await cp(file, path.join(outdir,file));
+console.log(`Built island life with home-screen support: ${outdir}`);

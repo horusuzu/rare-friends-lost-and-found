@@ -1,6 +1,6 @@
-# Rare Friends: Lost & Found — project entry
+# Rare Friends: Our Little Island — project entry
 
-The new game lives in `games/lost-and-found`. Start with [PROJECT.md](PROJECT.md) for play instructions, screenshots and validation, or the [submission draft](submissions/lost-and-found/README.md). Genesis #597 is the post-office founder; playable identity remains an eligible Generations NFT. The upstream SDK documentation follows unchanged.
+A persistent companion and island-building game in `games/lost-and-found`. See [PROJECT.md](PROJECT.md), [game instructions](games/lost-and-found/README.md), and the [submission draft](submissions/lost-and-found/README.md). This replaces the initial delivery prototype. The upstream SDK documentation follows.
 
 # FriendSDK v0.1.2
 

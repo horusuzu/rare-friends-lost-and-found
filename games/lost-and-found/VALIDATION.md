@@ -1,33 +1,26 @@
-# Validation — September 21, 2026
+# Island-life validation — September 21, 2026
 
-## Game
+This record covers the replacement of the 90-second delivery prototype with persistent companion/island gameplay.
 
-- Build and SDK game-boundary/schema validation: PASS.
-- Strict TypeScript check for the new game: PASS.
-- Delivery model: 9 tests PASS. Lines 98.51%, branches 98.25%, functions 100%. Line/function thresholds enforced at 80%. This is **model-only coverage**, not whole-UI coverage.
-- Automated browser journeys: PASS at 1100 × 900 and 390 × 844 browser viewports, with the actual SDK sandbox/runtime and its read-only mocked wallet/RPC. Selected fixture Friend #7730 is not the builder's claimed NFT.
-- Browser journeys cover starting a delivery, navigating connected stops, wrong-address feedback, successful delivery, a decoded 1200 × 800 PNG postcard, dialog isolation, returning home, purchase cancellation without charge, one confirmed 2 demo RF cosmetic purchase, preventing a second cosmetic purchase, settings pause, time expiration, English/Japanese switching and horizontal bounds.
-- No wallet signatures or funds were used. The test helper rejects unexpected network requests and signing methods.
+## Verified
 
-## Upstream SDK
+- SDK build and game TypeScript check passed.
+- 11 life-model tests passed; model-only coverage: 100% lines/functions, 97.30% branches, all three 80% thresholds enforced.
+- 24 save bridge, frame bridge, ownership discovery, RPC batching/backoff and PWA metadata tests passed.
+- Browser journeys passed at 390×844 and 1100×900: feed, beach choice, bring gifts home, postcard image, garden construction, sleep, harvest, rename, reload/reconnect, restore day/name/progress, no horizontal overflow.
+- Optional cosmetic journey passed at both sizes: cancel purchase, confirm through SDK, show cosmetic, reload retains care while clearing the session cosmetic.
+- Screenshots inspected at both sizes. Phone navigation sits above the trusted wallet toolbar.
+- Browser fixtures use Friend #7730, never a claimed builder NFT. Test helper checks opaque sandbox, fresh ownership reads and absence of signing methods.
+- Bounded preview saves distinguish games/NFTs/canonical wallets, reject malformed/oversized requests and report unavailable/quota errors. Stale bridge sessions cannot save. Local saves do not grant ownership.
 
-- Full Node 22 suite: 114 PASS, 0 FAIL, 2 SKIP (optional local-contract/Anvil setup absent).
-- An initial Node 26 run had one watch-output test failure (empty asset response during rebuild). The runner suite and then the full suite passed on the documented Node 22 runtime. No upstream runtime code was modified to hide the failure.
-- The newly downloaded Chromium 153 headless shell stalled at launch on this Mac. Browser journeys passed using existing Chrome for Testing 149 via the test-only `LOST_FOUND_CHROMIUM` executable override. The game bundle has no dependency on that path.
+The tested release was built from an isolated checkout of committed SDK sources plus this game's changes, preserving the previously verified RPC batching fix. Unrelated uncommitted reversions in the main working directory were not published or removed.
 
 ## Independent review
 
-One narrowly scoped code reviewer examined wallet boundaries, stale asynchronous actions, duplicate-purchase protection, paused state and terminal routes while the main agent ran visual/browser checks. It found a keyboard-accessible Settings/postcard overlap that could strand the return action. Background controls are now inert during dialogs, focus stays in the dialog, and Escape closes it. The browser test checks the inert background and keyboard containment. No ownership bypass or signer access was found.
+One child implemented and tested the save boundary while the parent built the game, then reviewed the game and packaging. Review caught three issues: accessible button names, disabled controls in focus trapping, and lock state after client replacement. All were fixed. PWA caches are scope-specific. The extra review had concrete correctness benefits; no token savings were measured.
 
-This review had a concrete benefit: one modal-state bug caught and fixed. Token-cost savings were not measured or claimed.
+## Limits
 
-## Still unverified / deliberately absent
+The previous delivery version was successfully played by the holder, who asked for more attachment and persistent life. This new version still awaits their playtest and is not yet filed as a contest entry.
 
-- Real connected-wallet play with the builder's hardwired Generations NFT is pending. Genesis #597 alone is insufficient under the SDK rules.
-- Real no-wallet build blocks access at the SDK connection gate; this is distinct from a successful wallet playtest.
-- Public hosting, official submission, actual user retention and real RF consumption are not yet completed or measured.
-- Mobile testing is Chromium at phone dimensions, not a physical iPhone/Safari wallet session.
-- Cards can be saved through the browser image menu or screenshot. The sandbox has no automatic download/social-sharing bridge. Device-specific image saving still needs a real-device check.
-- No live contracts, RF burn, automatic social posting, other players' messages, on-chain rewards, persistent progress, or production deployment.
-
-See PROJECT.md for commands. Screenshots in `artifacts/` are clearly documented automated-test evidence.
+Phone tests are Chromium viewport tests, not a physical iPhone wallet/home-screen installation. PWA metadata does not supply an injected mobile wallet. Online ownership verification remains required; no cloud synchronization, native store package or wallet relay is implemented. Browser data deletion removes local progress. Core game materials/results are simulated. No live RF transaction, payout, mint or production Rare Friends deployment occurred.
