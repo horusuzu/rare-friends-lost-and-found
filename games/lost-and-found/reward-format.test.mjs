@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {tokenAmount} from './reward-format.ts';
+test('real amounts keep integer precision and never round a nonzero amount to zero',()=>{assert.equal(tokenAmount(0n),'0');assert.equal(tokenAmount(1n),'<0.000001');assert.equal(tokenAmount(123456789123456789123456789000000000n),'123,456,789,123,456,789.123456');assert.equal(tokenAmount(125000000000000000000n),'125');assert.equal(tokenAmount(1000000000000000n,8),'0.001');});
