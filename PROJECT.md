@@ -43,6 +43,6 @@ The browser suite can use an already-installed Chromium through the optional `LO
 
 ## Submission status
 
-Local prototype and English [submission draft](submissions/lost-and-found/README.md) are prepared. Public hosting and submission have not been performed. Real connected-wallet play with the builder's eligible Generations NFT remains to be checked. No Genesis ownership is inferred from holding the test fixture.
+The [public preview](https://horusuzu.github.io/rare-friends-lost-and-found/) and [source repository](https://github.com/horusuzu/rare-friends-lost-and-found) are being published. The English [submission](submissions/lost-and-found/README.md) is prepared but not yet filed, pending the requested real-wallet playtest. Real connected-wallet play with the builder's eligible Generations NFT remains to be checked. No Genesis ownership is inferred from holding the test fixture.
 
 See [game rules and asset credits](games/lost-and-found/README.md). The original SDK instructions remain in [README.md](README.md), [API.md](API.md) and [AGENTS.md](AGENTS.md).

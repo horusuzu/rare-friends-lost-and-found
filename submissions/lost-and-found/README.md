@@ -2,13 +2,19 @@
 
 **Every Friend has something worth bringing home.**
 
-Submission draft — not yet submitted. Replace the pending preview/source links after the builder's review and hosting.
+Submission prepared; real connected-wallet playtest in progress before filing.
 
 - **Builder:** Genesis #597 holder / GitHub @horusuzu
 - **Category:** Character Spotlight (primary); Economy Potential (secondary relevance)
 - **Stack:** FriendSDK v0.1.2, React 19, TypeScript, original SVG map, Canvas postcard renderer.
-- **Public playable preview:** Pending hosting.
-- **Source:** Pending public repository. Local project: `rare-friends-lost-and-found`, game directory `games/lost-and-found`.
+- **Public playable preview:** https://horusuzu.github.io/rare-friends-lost-and-found/
+- **Source:** https://github.com/horusuzu/rare-friends-lost-and-found — game directory `games/lost-and-found`.
+
+## Screenshots
+
+![Lost & Found desk](https://raw.githubusercontent.com/horusuzu/rare-friends-lost-and-found/feat/lost-and-found/artifacts/desk-1100.png)
+
+Automated-test screenshot with fixture Friend #7730; the founder portrait is Genesis #597.
 
 ## What did you build?
 
