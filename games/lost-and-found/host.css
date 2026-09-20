@@ -1,0 +1,4 @@
+:root { --rf-game-max-width: 1120px; --rf-game-aspect-ratio: 1.5; }
+html, body { background: #e9e8df; }
+.rf-game-frame { border-radius: 16px; border: 1px solid #c9d0be; box-shadow: 0 20px 70px #314a3f12; }
+@media (max-width: 650px) { :root { --rf-game-aspect-ratio: .46; } .rf-game-frame { border-radius: 0; } }

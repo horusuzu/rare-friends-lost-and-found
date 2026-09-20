@@ -1,3 +1,7 @@
+# Rare Friends: Lost & Found — project entry
+
+The new game lives in `games/lost-and-found`. Start with [PROJECT.md](PROJECT.md) for play instructions, screenshots and validation, or the [submission draft](submissions/lost-and-found/README.md). Genesis #597 is the post-office founder; playable identity remains an eligible Generations NFT. The upstream SDK documentation follows unchanged.
+
 # FriendSDK v0.1.2
 
 Build a playable Rare Friends game with your AI coding agent. You create the
