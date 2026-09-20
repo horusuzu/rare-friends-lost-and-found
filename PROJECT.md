@@ -13,6 +13,8 @@ The former Lost & Found delivery game was played with the builder's own eligible
 
 Personal name, stable food preferences, three care actions, four outing destinations with eight choices/postcards, journal, friendship stages, garden/bridge/bench construction and responsive room illustrations. Sleep advances game time; closed-tab time never punishes the Friend. Local browser saves are isolated per verified NFT and game; errors are surfaced.
 
+The home piggy bank now separates real claimable RF/WETH and NFT-wallet holdings from simulated gameplay. Genesis #597 appears separately only after same-owner verification; claims stay on the official portfolio.
+
 The public build supports adding to the home screen. Wallet connection still requires a compatible browser wallet and online ownership reads. No cloud saves, native App Store package or mobile wallet relay is included. Home-screen storage can differ from browser storage.
 
 Core gameplay is free and simulated. An optional 2 demo RF room-frame cosmetic uses the SDK confirmation and lasts for the runtime session. No real RF spending, payouts or NFT minting.

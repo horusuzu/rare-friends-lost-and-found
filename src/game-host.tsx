@@ -17,6 +17,8 @@ import { createFriendWalletSession, createFriendPublicClient, type FriendWalletP
 
 export type GameHostProps = {
   definition: ChanceGameDefinition;
+  /** Optional linked Genesis, displayed only after same-owner verification. */
+  linkedGenesisId?: bigint;
   frameUrl: string;
   /** Explicit live deployment; omit for simulated gameplay. */
   deployment?: LiveGameDeployment;
@@ -102,6 +104,8 @@ function WalletViewport({ session, publicClient, ...props }: Omit<GameHostProps,
 
 export type ConnectedGameHostProps = {
   definition: ChanceGameDefinition;
+  /** Optional linked Genesis, displayed only after same-owner verification. */
+  linkedGenesisId?: bigint;
   /** Optional integration with connection and selection already available in this project. */
   selectedFriend: GameFriend | null;
   account: string | null;
@@ -122,7 +126,7 @@ type Picker = Pick<GameFrameProps, "friends" | "onSelectFriend" | "connection" |
 /** SDK frame for a project that already supplies connection and selection. */
 export function ConnectedGameHost(props: ConnectedGameHostProps) { return <ConnectedViewport {...props} />; }
 
-function ConnectedViewport({ definition, selectedFriend, account, chainId, publicClient, frameUrl, revision = 0, picker, deployment, walletClient, assertActive }: ConnectedGameHostProps & { picker?: Picker }) {
+function ConnectedViewport({ linkedGenesisId, definition, selectedFriend, account, chainId, publicClient, frameUrl, revision = 0, picker, deployment, walletClient, assertActive }: ConnectedGameHostProps & { picker?: Picker }) {
   const ledgerState = useRef({ definition, revision: 0, ledgers: new Map<string, PreviewGameClient>() });
   if (ledgerState.current.definition !== definition) ledgerState.current = { definition, revision: ledgerState.current.revision + 1, ledgers: new Map() };
   const ledgers = ledgerState.current.ledgers;
@@ -133,11 +137,11 @@ function ConnectedViewport({ definition, selectedFriend, account, chainId, publi
     <p className="rf-runtime-status" role="status">Connect a wallet and choose an owned hardwired Friend.</p>
   </GameFrame>;
   return <EligibilityGate key={sessionKey} definition={definition} picker={picker} friend={selectedFriend} account={account} chainId={chainId} publicClient={publicClient}
-    frameUrl={frameUrl} ledgers={ledgers} deployment={deployment} walletClient={walletClient} assertActive={assertActive} />;
+    frameUrl={frameUrl} linkedGenesisId={linkedGenesisId} ledgers={ledgers} deployment={deployment} walletClient={walletClient} assertActive={assertActive} />;
 }
 
-function EligibilityGate({ definition, picker, friend, account, chainId, publicClient, frameUrl, ledgers, deployment, walletClient, assertActive }: {
-  definition: ChanceGameDefinition; picker?: Picker;
+function EligibilityGate({ linkedGenesisId, definition, picker, friend, account, chainId, publicClient, frameUrl, ledgers, deployment, walletClient, assertActive }: {
+  definition: ChanceGameDefinition; picker?: Picker; linkedGenesisId?: bigint;
   friend: GameFriend; account: string; chainId: number; publicClient: GenerationIdentityClient; frameUrl: string;
   ledgers: Map<string, PreviewGameClient>;
   deployment?: LiveGameDeployment; walletClient?: ChanceWalletClient; assertActive?: () => void;
@@ -190,11 +194,11 @@ function EligibilityGate({ definition, picker, friend, account, chainId, publicC
     ledgers.set(ledgerKey, client);
   }
   // Remount both the bridge and child on any identity/network/URL change.
-  return <EmbeddedSession key={frameUrl} picker={picker} friend={{ ...friend, kind: "owned", walletAddress: checked.walletAddress }} client={client} definition={definition} frameUrl={frameUrl} rewards={{ publicClient, account: account as Address }} />;
+  return <EmbeddedSession key={frameUrl} picker={picker} friend={{ ...friend, kind: "owned", walletAddress: checked.walletAddress }} client={client} definition={definition} frameUrl={frameUrl} rewards={{ publicClient, account: account as Address, genesisId: linkedGenesisId }} />;
 }
 
 function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, rewards }: {
-  friend: GameFriend; client?: GameClient; definition: ChanceGameDefinition; live?: LiveGameOptions; frameUrl: string; picker?: Picker; rewards?: { publicClient: GenerationIdentityClient; account: Address };
+  friend: GameFriend; client?: GameClient; definition: ChanceGameDefinition; live?: LiveGameOptions; frameUrl: string; picker?: Picker; rewards?: { publicClient: GenerationIdentityClient; account: Address; genesisId?: bigint };
 }) {
   const liveRef = useRef(live); liveRef.current = live;
   const mode = live ? "live" : "preview";
@@ -322,7 +326,7 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, r
         const context = rewards;
         activeClient = { ...activeClient, readRewards: async () => {
           if (!alive || epoch.current !== bridgeEpoch) throw new Error('Game session changed.');
-          const value = await readFriendRewards(context.publicClient, { friendId: friend.id, account: context.account, walletAddress: friend.walletAddress as Address });
+          const value = await readFriendRewards(context.publicClient, { friendId: friend.id, account: context.account, walletAddress: friend.walletAddress as Address, genesisId: context.genesisId });
           if (!alive || epoch.current !== bridgeEpoch) throw new Error('Game session changed.');
           return value;
         } };
@@ -352,7 +356,7 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, r
       bridge.current?.close(); bridge.current = null;
       pending.current?.();
     };
-  }, [client, definition, friend.id, attempt, rewards?.publicClient, rewards?.account]);
+  }, [client, definition, friend.id, attempt, rewards?.publicClient, rewards?.account, rewards?.genesisId]);
 
   async function topUp() {
     if (fundingRef.current || actionPending.current || !liveRef.current) return;

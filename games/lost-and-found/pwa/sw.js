@@ -1,6 +1,6 @@
 // Network-first shell only. Ownership, RPC calls and save data are never cached.
 const PREFIX = `rare-friends-island-life:${self.registration.scope}:`;
-const CACHE = `${PREFIX}v2`;
+const CACHE = `${PREFIX}v3`;
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => event.waitUntil((async () => {
  for (const key of await caches.keys()) if (key.startsWith(PREFIX) && key !== CACHE) await caches.delete(key);

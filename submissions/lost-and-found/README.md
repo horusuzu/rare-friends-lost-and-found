@@ -22,6 +22,10 @@ Connect a compatible browser wallet holding a Generations NFT (generation >=1) o
 
 The interface is Japanese-first: おうち = Home, おでかけ = Outings, 島づくり = Build, 思い出 = Memories. On Home, choose ごはん to feed or おやすみ to advance a day. Visit the shore, pick a choice, and return home with materials. Build 小さな花畑 (garden), sleep, and pick the flowers; build 灯台への橋 (bridge) to unlock the fourth destination. Settings lets you rename the Friend.
 
+## Real reward piggy bank
+
+The room connects the companion experience to actual on-chain rewards: claimable RF/WETH and canonical NFT-wallet holdings appear separately, with timestamps and errors instead of invented zeroes. A linked Genesis #597 is displayed only for its verified owner. Claims and activation remain on the official portfolio; care does not increase yield. No earnings forecasts or real-money transactions are part of the game.
+
 ## Persistence and mobile
 
 Bounded local saves cross the opaque iframe through an explicit preview-only SDK bridge. The trusted host chooses a game/NFT/canonical-wallet namespace; child code cannot select another key. Fresh ownership verification remains mandatory at each session. Saves never grant ownership or real assets. Storage errors remain visible and retryable.

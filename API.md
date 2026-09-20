@@ -428,3 +428,9 @@ your design needs. The browser runtime supports preview and explicitly configure
 live play. See the
 [capability list](HOST_INTEGRATION.md#capabilities) for implemented functions and
 remaining integration work.
+
+## Optional real reward read (island preview extension)
+
+`GameClient.readRewards?(): Promise<FriendRewardsSnapshot>` is read-only and separate from `read()`'s simulated ledger. The host binds it to the selected verified Generations NFT. `GameHost` / `ConnectedGameHost` accept optional `linkedGenesisId: bigint`; CLI `game.json` accepts the positive decimal string equivalent. A linked Genesis is included only after verifying the same owner at the snapshot block. This does not replace Generations eligibility.
+
+The result has `friendId`, `blockNumber`, `checkedAt`, `walletAddress`, `active`, `claimableRF`, `claimableWETH`, `walletRF`, `walletWETH`. Amounts and IDs are bigint; token amounts are 18-decimal base units. Optional `genesis` has the same amount fields and `tokenId` instead of `friendId`. No snapshot field is a promise of future income. Failed reads reject, and closed sessions invalidate pending reads. There is no claim/activate/withdraw bridge action.

@@ -27,3 +27,12 @@ Published GitHub Pages revision: `3e6698a`. Deployment succeeded; remote runtime
 The previous delivery version was successfully played by the holder, who asked for more attachment and persistent life. This new version still awaits their playtest and is not yet filed as a contest entry.
 
 Phone tests are Chromium viewport tests, not a physical iPhone wallet/home-screen installation. PWA metadata does not supply an injected mobile wallet. Online ownership verification remains required; no cloud synchronization, native store package or wallet relay is implemented. Browser data deletion removes local progress. Core game materials/results are simulated. No live RF transaction, payout, mint or production Rare Friends deployment occurred.
+
+## Real reward piggy-bank revision
+
+- Canonical API/ABIs checked against official config and contracts documentation. Same-block live read verifies the selected Friend and same-owner Genesis #597, its active weight, claimable RF/WETH and canonical wallet balances. Exact personal balances are intentionally not recorded in public source.
+- 22 reward-reader, frame-bridge and local-save tests pass; reader coverage 100% lines/functions, 95.65% branches (80% enforced). Separate amount tests keep bigint precision and show nonzero dust as a lower-than-display-precision value.
+- SDK/game typechecks and schema check pass. Read-only protocol research independently confirmed Genesis ABI differs by having no generation() call; code does not call it on Genesis. Independent code review found a configurable-token-label hardcode, corrected to the actual verified tokenId.
+- No claims, signatures, activation changes, transfers or funds used.
+- Reward browser journeys pass at 390×844 and 1100×900: separate Genesis/Generations amounts, refresh increase feedback, stale-value indication on RPC error, inactive positions, and trusted official-portfolio link. These screenshots use mocked amounts, not the holder's actual balances.
+- Existing life/cosmetic/save/reload browser journeys also pass at both sizes after adding the piggy bank.

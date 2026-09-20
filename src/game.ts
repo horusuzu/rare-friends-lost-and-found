@@ -12,10 +12,11 @@ export type GameSnapshot = Readonly<{
 }>;
 
 /** Real on-chain amounts, separate from the game's simulated ledger. */
-export type FriendRewardsSnapshot = Readonly<{
-  friendId: bigint; blockNumber: bigint; checkedAt: number; walletAddress: string;
+export type NFTRewardAmounts = Readonly<{
+  blockNumber: bigint; checkedAt: number; walletAddress: string;
   active: boolean; claimableRF: bigint; claimableWETH: bigint; walletRF: bigint; walletWETH: bigint;
 }>;
+export type FriendRewardsSnapshot = NFTRewardAmounts & Readonly<{ friendId: bigint; genesis?: NFTRewardAmounts & Readonly<{tokenId: bigint}> }>;
 
 /** Player actions; randomness and funding are provided separately by the platform. */
 export type GameClient = Readonly<{

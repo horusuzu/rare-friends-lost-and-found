@@ -1,7 +1,8 @@
 import type { GenerationSprites } from '@rarefriends/friendsdk/sprites';
 import { FriendPixels } from './art.js';
+import {PiggyIcon} from './reward-panel.js';
 import type { Life, Card } from './life.js';
-export function LifeScene({life,sprites,reaction,onPet}:{life:Life;sprites:GenerationSprites;reaction:string;onPet:()=>void}) {
+export function LifeScene({life,sprites,reaction,onPet,onBank,bankDisabled}:{life:Life;sprites:GenerationSprites;reaction:string;onPet:()=>void;onBank?:()=>void;bankDisabled?:boolean}) {
  const place=life.location,home=place==='home',sea=place==='beach'||place==='lighthouse';
  return <div className={`life-scene scene-${place} reaction-${reaction}`}>
   <svg viewBox="0 0 600 350" role="img" aria-label={home?'少しずつ育つ、ふたりのおうち':'Friendと訪れた島の風景'}>
@@ -29,6 +30,7 @@ export function LifeScene({life,sprites,reaction,onPet}:{life:Life;sprites:Gener
    {home&&life.projects.includes('garden')&&<g transform="translate(552 280)"><ellipse rx="29" ry="10" fill="#9f8461"/>{[-15,0,15].map(x=><g key={x} transform={`translate(${x} 0)`}><path d="M0 0v-20" stroke="#6c8d5b" strokeWidth="3"/><circle cy="-22" r="7" fill={life.gardenReady?'#e8a393':'#9fb77b'}/></g>)}</g>}
   </svg>
   <button className="living-friend" type="button" onClick={onPet} aria-label={`${life.name}に話しかける`}><span className="friend-emote">{reaction==='eat'?'♡':reaction==='sleep'?'z z':reaction==='walk'?'♪':'♡'}</span><FriendPixels sprites={sprites} size={120}/><span className="pixel-shadow"/></button>
+  {home&&onBank&&<button type="button" className="scene-piggy" aria-label="部屋の貯金箱" disabled={bankDisabled} onClick={onBank}><PiggyIcon/></button>}
   <span className="scene-label">{home?'OUR LITTLE HOME':place==='beach'?'SALT AIR & SMALL TREASURES':place==='forest'?'TAKE THE LONG WAY HOME':place==='plaza'?'WARM BREAD, WARM COMPANY':'A BRIDGE WE BUILT TOGETHER'}</span>
  </div>;
 }
