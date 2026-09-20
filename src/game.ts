@@ -11,12 +11,19 @@ export type GameSnapshot = Readonly<{
   inventory: readonly bigint[]; plays: readonly GamePlay[];
 }>;
 
+/** Real on-chain amounts, separate from the game's simulated ledger. */
+export type FriendRewardsSnapshot = Readonly<{
+  friendId: bigint; blockNumber: bigint; checkedAt: number; walletAddress: string;
+  active: boolean; claimableRF: bigint; claimableWETH: bigint; walletRF: bigint; walletWETH: bigint;
+}>;
+
 /** Player actions; randomness and funding are provided separately by the platform. */
 export type GameClient = Readonly<{
   mode: 'preview' | 'chain'; definition: ChanceGameDefinition;
   /** Optional browser-local preview data; not on-chain inventory or RF. */
   loadLocal?: () => Promise<string | null>;
   saveLocal?: (value: string) => Promise<void>;
+  readRewards?: () => Promise<FriendRewardsSnapshot>;
   read(): Promise<GameSnapshot>;
   canBuy(quantity: bigint): Promise<boolean>;
   buy(quantity: bigint): Promise<void>;

@@ -1,13 +1,13 @@
 import type { ChanceGameDefinition, GameSnapshot, GameClient } from './game.js';
 
-export type GameMethod = 'read' | 'canBuy' | 'buy' | 'play' | 'settle' | 'redeem' | 'loadLocal' | 'saveLocal';
+export type GameMethod = 'read' | 'canBuy' | 'buy' | 'play' | 'settle' | 'redeem' | 'loadLocal' | 'saveLocal' | 'readRewards';
 export type GameArguments = readonly (bigint | number | string)[];
 const UINT256_MAX = (1n << 256n) - 1n;
 const quantity = (value: unknown) => typeof value === 'bigint' && value > 0n && value <= 99n;
 function valid(method: unknown, args: unknown, outcomes: number): args is (bigint | number | string)[] {
   if (!Array.isArray(args)) return false;
   switch (method) {
-    case 'read': case 'loadLocal': return args.length === 0;
+    case 'read': case 'loadLocal': case 'readRewards': return args.length === 0;
     case 'saveLocal': return args.length === 1 && validLocalValue(args[0]);
     case 'canBuy': case 'buy': case 'play': return args.length === 1 && quantity(args[0]);
     case 'settle': return args.length === 1 && typeof args[0] === 'bigint' && args[0] > 0n && args[0] <= UINT256_MAX;
@@ -26,6 +26,7 @@ const PUBLIC_ACTION_ERRORS = new Set([
   'Dice fee exceeds the approved maximum. Keep this pending cast and review the fee before retrying.',
 ]);
 function publicError(error: unknown, method: GameMethod): string {
+  if (method === 'readRewards') return 'Could not read real rewards. Try again later.';
   if (method === 'loadLocal' || method === 'saveLocal') return 'Local preview storage is unavailable.';
   if (error instanceof Error) {
     const transaction = error as Error & { code?: unknown; transactionHash?: unknown };
@@ -57,7 +58,7 @@ export function bindGameFrame(port: MessagePort, options: {
   onError?: (error: Error, method: GameMethod) => void;
   onActionChange?: (busy: boolean) => void;
 }) {
-  let alive = true, busy = false, lastId = 0, paused = false;
+  let alive = true, busy = false, rewardsBusy = false, lastId = 0, paused = false;
   const send = (message: unknown) => { if (alive) port.postMessage(message); };
   port.onmessage = async ({ data }: MessageEvent<unknown>) => {
     if (!alive || !data || typeof data !== 'object') return;
@@ -66,6 +67,19 @@ export function bindGameFrame(port: MessagePort, options: {
     const id = Number(request.id); lastId = id;
     if (!valid(request.method, request.args, options.client.definition.outcomes.length)) {
       send({ type: 'friendsdk:response', id, error: 'Unsupported game action.' }); return;
+    }
+    // This read never holds the simulated-ledger lock: closing the panel must not
+    // strand a care save while a public RPC is slow. Only one reward read at a time.
+    if (request.method === 'readRewards') {
+      if (rewardsBusy) { send({ type: 'friendsdk:response', id, error: 'A reward read is already pending.' }); return; }
+      rewardsBusy = true;
+      try {
+        if (!options.client.readRewards) throw new Error('Reward reader unavailable');
+        const value = await options.client.readRewards();
+        send({ type: 'friendsdk:response', id, value });
+      } catch { send({ type: 'friendsdk:response', id, error: publicError(new Error(), 'readRewards') }); }
+      finally { rewardsBusy = false; }
+      return;
     }
     if (busy) { send({ type: 'friendsdk:response', id, error: 'Another game action is pending.' }); return; }
     const method = request.method as GameMethod, args = request.args;
@@ -143,6 +157,7 @@ export function createFrameGameClient(port: MessagePort, definition: ChanceGameD
   }
   const client = Object.freeze<GameClient>({ mode, definition,
     ...(mode === 'preview' ? { loadLocal: () => call<string | null>('loadLocal', []), saveLocal: (value: string) => call<void>('saveLocal', [value]) } : {}),
+    readRewards: () => call('readRewards', []),
     read: () => call('read', []), canBuy: quantity => call('canBuy', [quantity]),
     buy: quantity => call('buy', [quantity]), play: (quantity = 1n) => call('play', [quantity]),
     settle: playId => call('settle', [playId]), redeem: (outcomeId, quantity) => call('redeem', [outcomeId, quantity]),
