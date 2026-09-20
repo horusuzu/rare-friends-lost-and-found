@@ -12,10 +12,10 @@ test('food preference changes bond and records a memory; full Friend cannot be s
 test('walk and rest are distinct care choices; low energy can recover without purchases', () => {
  const s = act(start(), 'walk'); assert.ok(s.energy < start().energy); assert.ok(s.bond > 0);
  const slept = act({...s, energy: 0}, 'sleep'); assert.equal(slept.energy, 100); assert.equal(slept.day, 2); assert.equal(slept.location, 'home');
- assert.match(greeting(slept), /まって|おはよう|おかえり/);
+ assert.match(greeting({...slept,hunger:60}), /まって|おはよう|おかえり/);
 });
 test('outing requires energy and locked areas cannot be entered', () => {
- const s = start(); assert.equal(depart(s, 'lighthouse'), s); assert.equal(depart({...s, energy: 0}, 'beach'), Object(depart({...s, energy: 0}, 'beach'))); assert.equal(depart({...s, energy:0},'beach').location,'home');
+ const s = start(); assert.equal(depart(s, 'lighthouse'), s); const tired={...s,energy:0}; assert.equal(depart(tired,'beach'),tired); assert.equal(depart({...s, energy:0},'beach').location,'home');
  const trip = depart(s, 'beach'); assert.equal(trip.location, 'beach'); assert.equal(act(trip, 'sleep'),trip); assert.equal(depart(trip,'forest'),trip);
 });
 test('choices produce different resources and memories; returning banks the trip', () => {
@@ -45,4 +45,10 @@ test('save roundtrip preserves a trip and rejects another Friend, corrupted or f
 test('invalid action/choice/project does not mutate state and journal is bounded', () => {
  let s=start(); assert.equal(act(s,'unknown'),s); assert.equal(build(s,'unknown'),s); assert.equal(choose(s,0),s); assert.equal(choose(depart(s,'beach'),8).choice,null);
  for(let i=0;i<40;i++) s=act(s,'sleep'); assert.equal(s.journal.length,24);
+});
+test('care feedback and malformed storage edge cases',()=>{
+ const s=start(); assert.match(greeting({...s,energy:1}),/ねむい/); assert.match(greeting({...s,hunger:1}),/おなか/); assert.match(greeting({...s,gardenReady:true}),/お花/); assert.ok(greeting(s));
+ assert.equal(act({...s,energy:0},'walk').energy,0); assert.match(act({...s,projects:['picnic']},'walk').message,/ベンチ/); assert.equal(act(s,'soup').bond,2);
+ assert.equal(restore(null,'77251'),null); assert.equal(restore('x'.repeat(32001),'77251'),null);
+ for(const patch of [{day:0},{projects:['bad']},{projects:['garden','garden']},{choice:2},{choice:0},{bag:{}},{bag:{wood:5,seeds:0,shells:0}},{journal:[{day:0,text:'x'}]},{cards:[{id:'beach-0',place:'beach',choice:0,day:1,title:'ok',text:7}]},{name:''},{gardenReady:'yes'}]) assert.equal(restore(JSON.stringify({...s,...patch}),'77251'),null);
 });
