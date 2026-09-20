@@ -172,11 +172,11 @@ function validLocalValue(value: unknown): value is string {
 
 /** Trusted runtime only: a fixed game/NFT slot, never a child-selected storage key. */
 export function createPreviewLocalStore(options: {
-  frameUrl: string; friendId: bigint; walletAddress: string;
+  frameUrl: string; friendId: bigint; collection?: "genesis" | "generations"; walletAddress: string;
   storage: () => Pick<Storage, 'getItem' | 'setItem'>;
   assertActive: () => void;
 }): Required<Pick<GameClient, 'loadLocal' | 'saveLocal'>> {
-  const key = `friendsdk:local-preview:v1:${JSON.stringify([options.frameUrl, options.friendId.toString(), options.walletAddress.toLowerCase()])}`;
+  const key = `friendsdk:local-preview:${options.collection === "genesis" ? "genesis:" : ""}v1:${JSON.stringify([options.frameUrl, options.friendId.toString(), options.walletAddress.toLowerCase()])}`;
   return {
     async loadLocal() {
       options.assertActive();

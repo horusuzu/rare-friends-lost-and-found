@@ -73,3 +73,9 @@ test('storage getter failures and write quotas reject rather than report a save'
     try { await assert.rejects(s.frame.client.saveLocal('value'), { message: 'Local preview storage is unavailable.' }); } finally { s.close(); }
   }
 });
+test('Genesis namespace cannot collide with an identical Generations ID and wallet; legacy save remains',async()=>{
+ const values=new Map();const storage={getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,v)};
+ const options={frameUrl:'https://game.test/a',friendId:597n,walletAddress:'0xabc',storage:()=>storage,assertActive(){}};
+ const old=bridge.createPreviewLocalStore(options),genesis=bridge.createPreviewLocalStore({...options,collection:'genesis'});
+ await old.saveLocal('old generations');assert.equal(await genesis.loadLocal(),null);await genesis.saveLocal('new genesis');assert.equal(await old.loadLocal(),'old generations');assert.equal(await genesis.loadLocal(),'new genesis');
+});

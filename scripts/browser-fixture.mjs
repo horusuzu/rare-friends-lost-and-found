@@ -7,6 +7,8 @@ import { FAMILIES_REGISTRY_ABI, GENERATION_SPRITE_MANIFEST } from "../dist/gener
 export const OWNER = "0x1111111111111111111111111111111111111111";
 export const SECOND_OWNER = "0x2222222222222222222222222222222222222222";
 export const FRIEND_WALLET = "0x3333333333333333333333333333333333333333";
+const GENESIS = "0x116EaA62241751E0c98dA43d458600c6C17cD361";
+const GENESIS_ABI = parseAbi(["function ownerOf(uint256) view returns (address)", "function tokenBoundAccount(uint256) view returns (address)", "function tokenURI(uint256) view returns (string)"]);
 const COLLECTION = "0x14C49e6118F46525dE9ab41a51cBAA3c6EBF181D";
 const ABI = parseAbi([
   "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)",
@@ -18,8 +20,8 @@ const ABI = parseAbi([
 const ownerId = owner => owner.toLowerCase() === OWNER.toLowerCase() ? 7730n : 3412n;
 const tokenOwner = id => id === 7730n ? OWNER : SECOND_OWNER;
 
-export async function installFixture(page, origin, { artworkCall, initialChain = "0x1237" } = {}) {
-  const state = { mode: "eligible", requests: [], ownerReads: 0, hold: null, release: null, errors: [] };
+export async function installFixture(page, origin, { artworkCall, initialChain = "0x1237", genesisOwner = SECOND_OWNER } = {}) {
+  const state = { genesisOwner, genesisReads: 0, mode: "eligible", requests: [], ownerReads: 0, hold: null, release: null, errors: [] };
   await page.addInitScript(({ owner, initialChain }) => {
     // Internal automation is the only place an account/identity may be mocked.
     const listeners = new Map();
@@ -69,7 +71,14 @@ export async function installFixture(page, origin, { artworkCall, initialChain =
         data: "0x", logIndex: "0x0", transactionHash: padHex("0x1234", { size: 32 }), transactionIndex: "0x0", removed: false,
         topics: encodeEventTopics({ abi: ABI, eventName: "Transfer", args: { from: zeroAddress, to: owner, tokenId: ownerId(owner) } }) }];
     } else if (request.method === "eth_call") {
-      if (request.params[0].to.toLowerCase() !== COLLECTION.toLowerCase()) {
+      if (request.params[0].to.toLowerCase() === GENESIS.toLowerCase()) {
+        const {functionName, args} = decodeFunctionData({abi: GENESIS_ABI, data: request.params[0].data});
+        assert.equal(args[0], 597n, "Only the configured Genesis is read; no scan");
+        if (functionName === "ownerOf") state.genesisReads++;
+        const value = functionName === "ownerOf" ? state.genesisOwner : functionName === "tokenBoundAccount" ? "0x4444444444444444444444444444444444444444" :
+          'data:application/json;base64,' + Buffer.from(JSON.stringify({properties:{pixels:'0x007e3c665a5a7e00',bit_order:'bit(y*8+x)=white',border_pixels:1}})).toString('base64');
+        result = encodeFunctionResult({abi: GENESIS_ABI, functionName, result: value});
+      } else if (request.params[0].to.toLowerCase() !== COLLECTION.toLowerCase()) {
         assert.equal(typeof artworkCall, "function", "Read only the pinned collection unless artwork is explicitly mocked");
         result = await artworkCall(request.params[0]);
       } else {

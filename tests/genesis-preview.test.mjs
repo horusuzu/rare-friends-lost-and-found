@@ -11,3 +11,7 @@ test('selected Genesis rewards use Genesis collection exactly once, never linked
 const uri=properties=>'data:application/json;base64,'+Buffer.from(JSON.stringify({properties})).toString('base64');
 test('Genesis canonical white-bit pixels become a doubled 16px portrait, not a Generations sprite',()=>{const art=sprites.decodeGenesisArtwork(597n,uri({pixels:'0x007e3c665a5a7e00',bit_order:'bit(y*8+x)=white',border_pixels:1}));assert.equal(art.collection,'genesis');assert.equal(art.tokenId,597n);assert.equal(art.familyName,'Genesis');assert.equal(art.clips.idle.down[0].rows[0],'################');assert.equal(art.clips.idle.down[0].rows[2],'##............##');});
 test('Genesis artwork fails explicitly for unsupported metadata',()=>{for(const raw of ['https://example.com',uri({}),uri({pixels:'0x123',bit_order:'wrong'})])assert.throws(()=>sprites.decodeGenesisArtwork(597n,raw));});
+test('Genesis artwork reader rejects wrong chain and IDs and reads only canonical tokenURI',async()=>{
+ const metadata=uri({pixels:'0x007e3c665a5a7e00',bit_order:'bit(y*8+x)=white',border_pixels:1});const c=fixture({tokenURI:metadata});assert.equal((await sprites.readGenesisArtwork(c,597n)).collection,'genesis');assert.equal(c.calls[0].address,D.genesis);assert.equal(c.calls[0].functionName,'tokenURI');
+ await assert.rejects(()=>sprites.readGenesisArtwork(c,0n));c.getChainId=async()=>1;await assert.rejects(()=>sprites.readGenesisArtwork(c,597n));
+});

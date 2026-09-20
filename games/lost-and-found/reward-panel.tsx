@@ -25,7 +25,7 @@ export function RewardPanel({client,friendId,previous,onRead,paused}:{client:Gam
  {loading&&<p role="status" className="reward-reading">お財布と報酬を確認しています…</p>}
  {increased&&!error&&<p className="reward-greeting" role="status">未受取の報酬が増えたよ。貯金箱を見てみて！</p>}
  {value?.genesis&&<Amounts title={`Genesis #${value.genesis.tokenId}`} value={value.genesis} prefix="genesis-"/>}
- {value&&<Amounts title={`Friend #${friendId}`} value={value}/>}
+ {value&&<Amounts title={`${value.collection==='genesis'?'Genesis':'Friend'} #${friendId}`} value={value}/>}
  {value&&<p className="reward-updated">{new Date(value.checkedAt).toLocaleString('ja-JP')} 確認{error?'（更新失敗・前回値）':''}</p>}
  <button type="button" className="main-action" aria-label="最新の報酬を確認" disabled={loading||paused} onClick={()=>void refresh()}>{loading?'確認中…':'最新の報酬を確認'}<span>↻</span></button>
  <div className="reward-official"><b>受け取りは公式サイトで</b><p>この画面を閉じ、下の「Friend wallet」から「公式で確認・受取」を開いてください。</p></div>

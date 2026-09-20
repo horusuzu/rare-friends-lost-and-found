@@ -3,7 +3,7 @@ import { EDGES, NODES, neighbours, type Language, type NodeId } from './model.js
 
 export function FriendPixels({ sprites, size = 56 }: { sprites: GenerationSprites; size?: number }) {
   const rows = sprites.clips.idle.down[0].rows;
-  return <svg width={size} height={size} viewBox="0 0 16 16" shapeRendering="crispEdges" role="img" aria-label={`Friend #${sprites.tokenId}`}>
+  return <svg width={size} height={size} viewBox="0 0 16 16" shapeRendering="crispEdges" role="img" aria-label={`${sprites.collection === "genesis" ? "Genesis" : "Friend"} #${sprites.tokenId}`}>
     {rows.flatMap((row, y) => [...row].flatMap((pixel, x) => pixel === '#' ? [<rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" fill="#203e3d" />] : []))}
   </svg>;
 }

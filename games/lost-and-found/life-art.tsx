@@ -42,5 +42,5 @@ export function memoryImage(card:Card,life:Life,sprites:GenerationSprites):strin
  x.fillStyle='#35584b';sprites.clips.idle.down[0].rows.forEach((row,y)=>[...row].forEach((p,col)=>{if(p==='#')x.fillRect(390+col*12,176+y*12,12,12);}));
  x.fillStyle='#38584b';x.font='bold 32px sans-serif';x.fillText(card.title,65,480);x.font='22px sans-serif';x.fillText(`${life.name}と過ごした ${card.day}日目`,65,524);
  x.font='20px sans-serif';const chars=[...card.text];for(let i=0;i<chars.length;i+=37)x.fillText(chars.slice(i,i+37).join(''),65,570+Math.floor(i/37)*32);
- x.font='15px monospace';x.fillText(`FRIEND #${life.friendId} / OUR LITTLE ISLAND / PERSONAL KEEPSAKE`,65,680);return c.toDataURL('image/png');
+ x.font='15px monospace';x.fillText(`${sprites.collection === "genesis" ? "GENESIS" : "FRIEND"} #${life.friendId} / OUR LITTLE ISLAND / PERSONAL KEEPSAKE`,65,680);return c.toDataURL('image/png');
 }

@@ -84,6 +84,7 @@ export async function buildGame(gameDirectory, { outdir = path.join(gameDirector
   const gameInput = JSON.parse(await readFile(definitionPath, 'utf8'));
   const definition = parseChanceGame(gameInput);
   const genesisId = gameInput.linkedGenesisId;
+  if (gameInput.allowGenesisPreview !== undefined && typeof gameInput.allowGenesisPreview !== 'boolean') throw new Error('allowGenesisPreview must be boolean.');
   if (genesisId !== undefined && (typeof genesisId !== 'string' || !/^[1-9][0-9]{0,77}$/.test(genesisId) || BigInt(genesisId) >= (1n << 256n))) throw new Error('linkedGenesisId must be a positive uint256 decimal string.');
   const componentPath = path.join(directory, 'index.tsx');
   await stat(componentPath);
@@ -150,7 +151,7 @@ import {GameHost} from '@rarefriends/friendsdk/runtime';
 ${hostStyleImport}
 const deployment = ${JSON.stringify(liveDeployment) ?? 'undefined'};
 if (deployment) deployment.deploymentBlock = BigInt(deployment.deploymentBlock);
-createRoot(document.getElementById('root')).render(<GameHost definition={definition} frameUrl="./game.html" deployment={deployment} linkedGenesisId={${genesisId === undefined ? "undefined" : `${BigInt(genesisId)}n`}}/>);`,
+createRoot(document.getElementById('root')).render(<GameHost definition={definition} frameUrl="./game.html" deployment={deployment} allowGenesisPreview={${gameInput.allowGenesisPreview === true}} linkedGenesisId={${genesisId === undefined ? "undefined" : `${BigInt(genesisId)}n`}}/>);`,
   } });
   let child;
   try {

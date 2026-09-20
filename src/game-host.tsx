@@ -11,7 +11,7 @@ import { createGamePreview, maximumPrize, RF, type ChanceGameDefinition, type Ga
 import { createLiveGameClient, LIVE_GAME_MAX_ORACLE_FEE, type LiveGameDeployment, type LiveGameOptions } from "./live-game.js";
 import { fundFriendWallet } from "./friend-funding.js";
 import type { ChanceWalletClient } from "./chain.js";
-import { readGenerationEligibility, type GenerationIdentityClient } from "./identity.js";
+import { readGenerationEligibility, readGenesisEligibility, type GenerationIdentityClient } from "./identity.js";
 import { readOwnedFriends, type OwnedFriendsClient, type OwnedFriend } from "./owned-friends.js";
 import { createFriendWalletSession, createFriendPublicClient, type FriendWalletProvider, type FriendWalletSession } from "./wallet.js";
 
@@ -19,6 +19,8 @@ export type GameHostProps = {
   definition: ChanceGameDefinition;
   /** Optional linked Genesis, displayed only after same-owner verification. */
   linkedGenesisId?: bigint;
+  /** Explicit opt-in for Genesis companion previews; never enables live actions. */
+  allowGenesisPreview?: boolean;
   frameUrl: string;
   /** Explicit live deployment; omit for simulated gameplay. */
   deployment?: LiveGameDeployment;
@@ -61,26 +63,33 @@ function WalletViewport({ session, publicClient, ...props }: Omit<GameHostProps,
     }
   }, [session, wallet.revision, provider]);
   const [attempt, setAttempt] = useState(0);
-  const [selected, setSelected] = useState<bigint | null>(null);
+  const [selected, setSelected] = useState<{id: bigint; collection?: "genesis" | "generations"} | null>(null);
   const [discovery, setDiscovery] = useState<{
-    client: OwnedFriendsClient; session: FriendWalletSession; revision: number; attempt: number; friends: readonly OwnedFriend[]; hiddenCount?: number; error?: string;
+    client: OwnedFriendsClient; session: FriendWalletSession; revision: number; attempt: number; friends: readonly GameFriend[]; hiddenCount?: number; error?: string;
   } | null>(null);
   const valid = wallet.status === "connected" && discovery?.revision === wallet.revision &&
     discovery.client === publicClient && discovery.session === session && discovery.attempt === attempt ? discovery : null;
   const friends = valid?.friends ?? [];
-  const friend = friends.find(value => value.id === selected) ?? null;
+  const friend = friends.find(value => value.id === selected?.id && (value.collection ?? "generations") === (selected.collection ?? "generations")) ?? null;
   useEffect(() => {
     setSelected(null);
     if (wallet.status !== "connected" || !wallet.account) return;
     const controller = new AbortController();
-    void readOwnedFriends(publicClient, wallet.account, { signal: controller.signal }).then(result => {
-      if (!controller.signal.aborted) setDiscovery({ client: publicClient, session, revision: wallet.revision, attempt, friends: result.friends, hiddenCount: result.hiddenCount });
-    }).catch(error => {
-      if (!controller.signal.aborted) setDiscovery({ client: publicClient, session, revision: wallet.revision, attempt, friends: [],
-        error: error instanceof Error ? error.message : "Could not load your Friends. Try again." });
+    const genesisEnabled = props.allowGenesisPreview && !props.deployment && props.linkedGenesisId !== undefined;
+    void Promise.allSettled([
+      readOwnedFriends(publicClient, wallet.account, { signal: controller.signal }),
+      genesisEnabled ? readGenesisEligibility(publicClient, props.linkedGenesisId!, wallet.account) : Promise.resolve(null),
+    ]).then(([generations, genesis]) => {
+      if (controller.signal.aborted) return;
+      const friends: GameFriend[] = [];
+      if (genesis.status === "fulfilled" && genesis.value?.eligible) friends.push({ id: props.linkedGenesisId!, collection: "genesis", label: `Genesis #${props.linkedGenesisId}`, kind: "owned", walletAddress: genesis.value.walletAddress });
+      if (generations.status === "fulfilled") friends.push(...generations.value.friends);
+      const errors = [generations.status === "rejected" ? "Generationsを読み込めませんでした。再読み込みしてください。" : "", genesis.status === "rejected" ? "Genesisを確認できませんでした。再読み込みしてください。" : ""].filter(Boolean);
+      setDiscovery({ client: publicClient, session, revision: wallet.revision, attempt, friends,
+        hiddenCount: generations.status === "fulfilled" ? generations.value.hiddenCount : 0, error: errors.join(" ") || undefined });
     });
     return () => controller.abort();
-  }, [session, publicClient, wallet.status, wallet.account, wallet.revision, attempt]);
+  }, [session, publicClient, wallet.status, wallet.account, wallet.revision, attempt, props.allowGenesisPreview, props.linkedGenesisId, props.deployment]);
   const connection = <div className="rf-runtime-connection">
     {wallet.status === "unavailable" && <><p>No browser wallet found. Enable your wallet extension or open this game in your wallet’s browser.</p><button type="button" onClick={() => { void session.connect(); }}>Check for wallet</button></>}
     {wallet.status === "disconnected" && <p>Connect your wallet to find your Friends on Robinhood.</p>}
@@ -96,7 +105,7 @@ function WalletViewport({ session, publicClient, ...props }: Omit<GameHostProps,
     {wallet.status === "wrong-network" && <><button type="button" className="rf-frame-primary" onClick={() => { void session.switchNetwork(); }}>Switch to Robinhood</button><button type="button" onClick={() => { void session.refresh(); }}>Check network</button></>}
   </div>;
   return <ConnectedViewport {...props} selectedFriend={friend} account={wallet.account} chainId={wallet.chainId}
-    publicClient={publicClient} revision={wallet.revision} walletClient={walletClient} assertActive={assertWalletActive} picker={{ friends, onSelectFriend: setSelected, connection,
+    publicClient={publicClient} revision={wallet.revision} walletClient={walletClient} assertActive={assertWalletActive} picker={{ friends, onSelectFriend: (id, collection) => setSelected({id, collection}), connection,
       friendsLoading: wallet.status === "connected" && !valid, friendsError: valid?.error,
       friendsHiddenCount: valid?.hiddenCount,
       friendsEmptyMessage: valid && !valid.error ? valid.hiddenCount ? "No eligible Friends available in this wallet." : "No Rare Friends Generations NFTs found in this wallet on Robinhood." : null }} />;
@@ -106,6 +115,8 @@ export type ConnectedGameHostProps = {
   definition: ChanceGameDefinition;
   /** Optional linked Genesis, displayed only after same-owner verification. */
   linkedGenesisId?: bigint;
+  /** Explicit opt-in for Genesis companion previews; never enables live actions. */
+  allowGenesisPreview?: boolean;
   /** Optional integration with connection and selection already available in this project. */
   selectedFriend: GameFriend | null;
   account: string | null;
@@ -126,22 +137,22 @@ type Picker = Pick<GameFrameProps, "friends" | "onSelectFriend" | "connection" |
 /** SDK frame for a project that already supplies connection and selection. */
 export function ConnectedGameHost(props: ConnectedGameHostProps) { return <ConnectedViewport {...props} />; }
 
-function ConnectedViewport({ linkedGenesisId, definition, selectedFriend, account, chainId, publicClient, frameUrl, revision = 0, picker, deployment, walletClient, assertActive }: ConnectedGameHostProps & { picker?: Picker }) {
+function ConnectedViewport({ allowGenesisPreview, linkedGenesisId, definition, selectedFriend, account, chainId, publicClient, frameUrl, revision = 0, picker, deployment, walletClient, assertActive }: ConnectedGameHostProps & { picker?: Picker }) {
   const ledgerState = useRef({ definition, revision: 0, ledgers: new Map<string, PreviewGameClient>() });
   if (ledgerState.current.definition !== definition) ledgerState.current = { definition, revision: ledgerState.current.revision + 1, ledgers: new Map() };
   const ledgers = ledgerState.current.ledgers;
-  const key = JSON.stringify([selectedFriend?.id.toString(), selectedFriend?.walletAddress?.toLowerCase(), account?.toLowerCase(), chainId]);
+  const key = JSON.stringify([selectedFriend?.collection ?? "generations", allowGenesisPreview, linkedGenesisId?.toString(), selectedFriend?.id.toString(), selectedFriend?.walletAddress?.toLowerCase(), account?.toLowerCase(), chainId]);
   const sessionKey = `${key}:${revision}:${ledgerState.current.revision}:${deployment?.game ?? "preview"}`;
   if (!selectedFriend || !account || chainId === null || !publicClient) return <GameFrame mode={deployment ? "live" : "preview"} selectionMode={picker ? "picker" : "host"}
-    friends={selectedFriend ? [selectedFriend] : []} selectedFriendId={selectedFriend?.id ?? null} {...picker}>
+    friends={selectedFriend ? [selectedFriend] : []} selectedFriendId={selectedFriend?.id ?? null} selectedFriendCollection={selectedFriend?.collection} {...picker}>
     <p className="rf-runtime-status" role="status">Connect a wallet and choose an owned hardwired Friend.</p>
   </GameFrame>;
   return <EligibilityGate key={sessionKey} definition={definition} picker={picker} friend={selectedFriend} account={account} chainId={chainId} publicClient={publicClient}
-    frameUrl={frameUrl} linkedGenesisId={linkedGenesisId} ledgers={ledgers} deployment={deployment} walletClient={walletClient} assertActive={assertActive} />;
+    frameUrl={frameUrl} allowGenesisPreview={allowGenesisPreview} linkedGenesisId={linkedGenesisId} ledgers={ledgers} deployment={deployment} walletClient={walletClient} assertActive={assertActive} />;
 }
 
-function EligibilityGate({ linkedGenesisId, definition, picker, friend, account, chainId, publicClient, frameUrl, ledgers, deployment, walletClient, assertActive }: {
-  definition: ChanceGameDefinition; picker?: Picker; linkedGenesisId?: bigint;
+function EligibilityGate({ allowGenesisPreview, linkedGenesisId, definition, picker, friend, account, chainId, publicClient, frameUrl, ledgers, deployment, walletClient, assertActive }: {
+  definition: ChanceGameDefinition; picker?: Picker; linkedGenesisId?: bigint; allowGenesisPreview?: boolean;
   friend: GameFriend; account: string; chainId: number; publicClient: GenerationIdentityClient; frameUrl: string;
   ledgers: Map<string, PreviewGameClient>;
   deployment?: LiveGameDeployment; walletClient?: ChanceWalletClient; assertActive?: () => void;
@@ -155,7 +166,15 @@ function EligibilityGate({ linkedGenesisId, definition, picker, friend, account,
       setVerification({ client: publicClient, eligible: false, error: "Switch your wallet to Robinhood mainnet (4663)." });
       return () => { alive = false; };
     }
-    void readGenerationEligibility(publicClient, friend.id, account as Address).then(async result => {
+    void (async () => {
+      if (friend.collection === "genesis") {
+        if (deployment || !allowGenesisPreview) throw new Error("Genesis is available only in enabled companion previews.");
+        const result = await readGenesisEligibility(publicClient, friend.id, account as Address);
+        if (alive) setVerification({ client: publicClient, eligible: result.eligible, walletAddress: result.walletAddress,
+          error: result.eligible ? undefined : "このウォレットは選択したGenesisを所有していません。" });
+        return;
+      }
+      const result = await readGenerationEligibility(publicClient, friend.id, account as Address);
       let walletAddress: string | undefined;
       if (result.eligible) {
         walletAddress = await publicClient.readContract({ address: GENERATION_SPRITE_MANIFEST.generations, abi: WALLET_ABI,
@@ -164,22 +183,22 @@ function EligibilityGate({ linkedGenesisId, definition, picker, friend, account,
       }
       if (alive) setVerification({ client: publicClient, eligible: result.eligible === true, walletAddress,
         error: result.eligible ? undefined : "The connected account must own this hardwired Generations Friend (generation 1 or higher)." });
-    }).catch(cause => {
+    })().catch(cause => {
       if (alive) setVerification({ client: publicClient, eligible: false,
         error: `Could not verify this Friend. ${cause instanceof Error ? cause.message : "Try again."}` });
     });
     return () => { alive = false; };
-  }, [publicClient, friend.id, account, chainId, attempt]);
+  }, [publicClient, friend.id, friend.collection, account, chainId, attempt, allowGenesisPreview, deployment]);
   // A replaced read client invalidates verification during render, before effects.
   const checked = verification?.client === publicClient ? verification : null;
-  if (!checked?.eligible) return <GameFrame mode={deployment ? "live" : "preview"} selectionMode={picker ? "picker" : "host"} friends={[friend]} selectedFriendId={friend.id} {...picker}>
+  if (!checked?.eligible) return <GameFrame mode={deployment ? "live" : "preview"} selectionMode={picker ? "picker" : "host"} friends={[friend]} selectedFriendId={friend.id} selectedFriendCollection={friend.collection} {...picker}>
     <div className="rf-runtime-status" role={checked?.error ? "alert" : "status"}>
       <p>{checked?.error ?? "Checking ownership and hardwired eligibility…"}</p>
       {checked?.error && <button type="button" onClick={() => { setVerification(null); setAttempt(value => value + 1); }}>Retry eligibility</button>}
     </div>
   </GameFrame>;
   if (deployment) {
-    if (!walletClient) return <GameFrame mode="live" friends={[friend]} selectedFriendId={friend.id} {...picker}>
+    if (!walletClient) return <GameFrame mode="live" friends={[friend]} selectedFriendId={friend.id} selectedFriendCollection={friend.collection} {...picker}>
       <p role="alert">Connect a wallet to send live game transactions.</p>
     </GameFrame>;
     return <EmbeddedSession key={frameUrl} picker={picker} friend={{ ...friend, kind: "owned", walletAddress: checked.walletAddress }}
@@ -187,7 +206,7 @@ function EligibilityGate({ linkedGenesisId, definition, picker, friend, account,
         friendWallet: checked.walletAddress as Address,
         publicClient: publicClient as LiveGameOptions["publicClient"], walletClient, assertActive }} />;
   }
-  const ledgerKey = `${chainId}:${friend.id}:${checked.walletAddress!.toLowerCase()}`;
+  const ledgerKey = `${chainId}:${friend.collection ?? "generations"}:${friend.id}:${checked.walletAddress!.toLowerCase()}`;
   let client = ledgers.get(ledgerKey);
   if (!client) {
     client = createGamePreview(definition, { friendId: friend.id, stake: maximumPrize(definition) * 10n, rfBalance: 20n * RF }).client;
@@ -315,7 +334,7 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, r
       if (activeClient.mode === "preview") {
         activeClient = { ...activeClient, ...createPreviewLocalStore({
           frameUrl: new URL(frameUrl, window.location.href).href,
-          friendId: friend.id, walletAddress: friend.walletAddress!,
+          friendId: friend.id, collection: friend.collection, walletAddress: friend.walletAddress!,
           storage: () => window.localStorage,
           assertActive() {
             if (!alive || epoch.current !== bridgeEpoch || bridge.current !== connection) throw new Error("Game session changed.");
@@ -326,7 +345,7 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, r
         const context = rewards;
         activeClient = { ...activeClient, readRewards: async () => {
           if (!alive || epoch.current !== bridgeEpoch) throw new Error('Game session changed.');
-          const value = await readFriendRewards(context.publicClient, { friendId: friend.id, account: context.account, walletAddress: friend.walletAddress as Address, genesisId: context.genesisId });
+          const value = await readFriendRewards(context.publicClient, { friendId: friend.id, collection: friend.collection, account: context.account, walletAddress: friend.walletAddress as Address, genesisId: context.genesisId });
           if (!alive || epoch.current !== bridgeEpoch) throw new Error('Game session changed.');
           return value;
         } };
@@ -343,7 +362,7 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, r
       bridge.current = connection;
       // An allow-scripts sandbox has an opaque origin: exact source-window check above
       // is the trust boundary, and * is required when transferring to that child.
-      frame.contentWindow!.postMessage({ type: "friendsdk:init", documentId, handshakeId, friendId: friend.id, mode: activeClient.mode }, "*", [channel.port2]);
+      frame.contentWindow!.postMessage({ type: "friendsdk:init", documentId, handshakeId, friendId: friend.id, collection: friend.collection ?? "generations", mode: activeClient.mode }, "*", [channel.port2]);
       bridge.current.setPaused(paused.current);
     }
     frame.addEventListener("load", load);
@@ -356,7 +375,7 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, r
       bridge.current?.close(); bridge.current = null;
       pending.current?.();
     };
-  }, [client, definition, friend.id, attempt, rewards?.publicClient, rewards?.account, rewards?.genesisId]);
+  }, [client, definition, friend.id, friend.collection, attempt, rewards?.publicClient, rewards?.account, rewards?.genesisId]);
 
   async function topUp() {
     if (fundingRef.current || actionPending.current || !liveRef.current) return;
@@ -377,7 +396,7 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, r
       if (mounted.current) setFundMessage(cause instanceof Error ? cause.message : "RF transfer failed.");
     } finally { fundingRef.current = false; if (mounted.current) { setFunding(false); bridge.current?.setPaused(paused.current); } }
   }
-  return <GameFrame mode={mode} selectionMode={picker ? "picker" : "host"} friends={[friend]} selectedFriendId={friend.id}
+  return <GameFrame mode={mode} selectionMode={picker ? "picker" : "host"} friends={[friend]} selectedFriendId={friend.id} selectedFriendCollection={friend.collection}
     wallet={{ balance: snapshot?.rfBalance, status: snapshot ? "ready" : "loading" }}
     walletActions={live ? <div className="rf-runtime-connection">
       <p>Transfer RF from your connected wallet to this Friend to buy bait. This is a real RF transfer plus ETH gas.</p>

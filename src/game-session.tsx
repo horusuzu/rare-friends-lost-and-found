@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createFrameGameClient } from "./frame-bridge.js";
 import type { ChanceGameDefinition, GameClient } from "./game.js";
 
-export type GameComponentProps = Readonly<{ friendId: bigint; client: GameClient; paused: boolean }>;
+export type GameComponentProps = Readonly<{ friendId: bigint; collection?: "genesis" | "generations"; client: GameClient; paused: boolean }>;
 
 /** Game-side bridge. The runtime supplies one verified Friend and a fixed action client. */
 export function GameSession({ definition, children }: {
@@ -25,7 +25,7 @@ export function GameSession({ definition, children }: {
         event.data.documentId !== documentId || event.data.handshakeId !== handshakeId ||
         typeof event.data.friendId !== "bigint" || event.data.friendId < 1n || event.ports.length !== 1) return;
       connection = createFrameGameClient(event.ports[0], definition, setPaused, event.data.mode === "chain" ? "chain" : "preview");
-      setSession({ friendId: event.data.friendId, client: connection.client });
+      setSession({ friendId: event.data.friendId, collection: event.data.collection === "genesis" ? "genesis" : "generations", client: connection.client });
     }
     window.addEventListener("message", receive);
     window.addEventListener("pagehide", unloading);
