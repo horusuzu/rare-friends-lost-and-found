@@ -1,0 +1,6 @@
+{
+  "name": "Lost & Found · Rare Friends",
+  "consumable": "Gold-foil stamp (session cosmetic)",
+  "price": "2000000000000000000",
+  "outcomes": [{ "name": "Unused SDK schema placeholder", "chanceBps": 10000, "reward": "1" }]
+}
