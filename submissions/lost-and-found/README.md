@@ -2,7 +2,7 @@
 
 **A Friend to come home to. An island you grow together.**
 
-Draft — not yet filed. The first delivery prototype passed a holder playtest technically, but failed its emotional goal. This revision replaces it with ongoing care and island life; a second holder playtest is pending.
+Submitted on 2026-09-21: [official Vibeathon PR #20](https://github.com/spokesz/rarefriends-vibeathon/pull/20). The holder completed a real-wallet Genesis #597 playtest and supplied four screenshots. The [filed submission](https://github.com/horusuzu/rarefriends-vibeathon/blob/submissions/our-little-island/submissions/our-little-island/README.md) contains the full English pitch, playtest gallery, run instructions, validation and disclosed SDK extensions. Organizer review is pending.
 
 - Builder: Genesis #597 holder / GitHub @horusuzu
 - Focus: Character Spotlight
