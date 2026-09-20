@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {bindGameFrame,createFrameGameClient} from '../dist/frame-bridge.js';
+const definition={name:'Life',consumable:'Frame',price:1n,outcomes:[{name:'Unused',chanceBps:10000,reward:1n}]};
+function connect(extra={}){const {port1,port2}=new MessageChannel();let snapshots=0;const host=bindGameFrame(port1,{client:{mode:'preview',definition,...extra},authorize:async()=>{throw Error('No signatures');},onSnapshot:()=>snapshots++});const frame=createFrameGameClient(port2,definition);return {host,frame,get snapshots(){return snapshots;},close(){host.close();frame.close();}};}
+test('real rewards are a separate read with no demo ledger update or approval',async()=>{
+ const expected={friendId:77251n,blockNumber:12n,claimableRF:9n,walletRF:2n,claimableWETH:1n,walletWETH:4n,active:true,checkedAt:1,walletAddress:'0x0000000000000000000000000000000000000001'};
+ const s=connect({readRewards:async()=>expected});try{assert.equal(typeof s.frame.client.readRewards,'function');assert.deepEqual(await s.frame.client.readRewards(),expected);assert.equal(s.snapshots,0);}finally{s.close();}
+});
+test('reward errors are sanitized and never become a zero balance',async()=>{const s=connect({readRewards:async()=>{throw Error('private RPC key');}});try{assert.equal(typeof s.frame.client.readRewards,'function');await assert.rejects(s.frame.client.readRewards(),/Could not read real rewards/);}finally{s.close();}});
+test('closing the selected Friend rejects its pending real reward read',async()=>{let finish,entered;const ready=new Promise(r=>entered=r);const s=connect({readRewards:()=>{entered();return new Promise(r=>finish=r);}});try{assert.equal(typeof s.frame.client.readRewards,'function');const read=s.frame.client.readRewards();const rejected=assert.rejects(read,/session changed/);await ready;s.host.close();finish({});await rejected;}finally{s.close();}});
