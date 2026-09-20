@@ -9,3 +9,8 @@ test('RPC failures, changed owner, wrong network or changed deployment never bec
  for(const overrides of [{ownerOf:wallet},{generation:0},{tokenBoundAccount:owner},{activationManager:wallet},{retired:true},{rf:wallet},{weth:wallet},{earned:new Error('RPC unavailable')}]){const {client}=fixture(overrides);await assert.rejects(readFriendRewards(client,options));}
  const {client}=fixture();client.getChainId=async()=>1;await assert.rejects(readFriendRewards(client,options));
 });
+test('linked Genesis rewards remain separate and require the same connected owner',async()=>{
+ const {client,calls}=fixture();const r=await readFriendRewards(client,{...options,genesisId:597n});assert.equal(r.genesis?.tokenId,597n);assert.equal(r.genesis?.claimableRF,123n);assert.ok(calls.some(c=>c.functionName==='earned'&&c.args[1]===REWARDS_DEPLOYMENT.genesis&&c.args[2]===597n));assert.ok(calls.every(c=>c.blockNumber===123n));
+ const original=client.readContract;client.readContract=async r=>r.address===REWARDS_DEPLOYMENT.genesis&&r.functionName==='ownerOf'?wallet:original(r);
+ const other=await readFriendRewards(client,{...options,genesisId:597n});assert.equal(other.genesis,undefined);
+});

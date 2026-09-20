@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';import {testGame} from '@rarefriends/friendsdk/testing';import {chromium} from 'playwright';import {decodeFunctionData,encodeFunctionResult,parseAbi} from 'viem';import {REWARDS_DEPLOYMENT as D} from '../../dist/friend-rewards.js';
+if(process.env.LOST_FOUND_CHROMIUM){const launch=chromium.launch.bind(chromium);chromium.launch=o=>launch({...o,executablePath:process.env.LOST_FOUND_CHROMIUM});}
+const abi=parseAbi(['function activationManager() view returns (address)','function tokenBoundAccount(uint256) view returns (address)','function positions(address,uint256) view returns (uint8,uint256)','function retired() view returns (bool)','function rf() view returns (address)','function weth() view returns (address)','function earned(address,address,uint256) view returns (uint256)','function balanceOf(address) view returns (uint256)']);
+for(const width of [390,1100])console.log(await testGame('./games/lost-and-found',{width,height:width===390?844:900,screenshot:`./artifacts/piggy-bank-${width}.png`,check:async({page,game,friendWallet})=>{
+ let failed=false,inactive=false,amount=125n*10n**18n;
+ await page.route('https://rpc.mainnet.chain.robinhood.com/**',async route=>{
+  if(route.request().method()!=='POST')return route.fallback();const raw=route.request().postDataJSON(),requests=Array.isArray(raw)?raw:[raw];let decoded;
+  try{decoded=requests.map(r=>{if(r.method!=='eth_call')throw Error();return decodeFunctionData({abi,data:r.params[0].data});});}catch{return route.fallback();}
+  if(!decoded.some(d=>['activationManager','positions','retired','rf','weth','earned'].includes(d.functionName))&&!requests.every(r=>[D.rf,D.weth].some(a=>a.toLowerCase()===r.params[0].to.toLowerCase())))return route.fallback();
+  const response=requests.map((r,i)=>{if(failed)return{jsonrpc:'2.0',id:r.id,error:{code:-32000,message:'Fixture unavailable'}};const {functionName:f,args}=decoded[i];const values={activationManager:D.manager,tokenBoundAccount:friendWallet,positions:[0,inactive?0n:100n],retired:false,rf:D.rf,weth:D.weth,earned:args?.[0]?.toLowerCase()===D.rf.toLowerCase()?amount:10n**15n,balanceOf:r.params[0].to.toLowerCase()===D.rf.toLowerCase()?9n*10n**18n:2n*10n**15n};return{jsonrpc:'2.0',id:r.id,result:encodeFunctionResult({abi,functionName:f,result:values[f]})};});await route.fulfill({json:Array.isArray(raw)?response:response[0],headers:{'access-control-allow-origin':'*'}});
+ });
+ await game.getByRole('button',{name:'貯金箱を見る',exact:true}).click();await game.getByTestId('claimable-rf').getByText('125',{exact:true}).waitFor();await game.getByTestId('wallet-rf').getByText('9',{exact:true}).waitFor();await game.getByText('アクティブ',{exact:true}).waitFor();
+ amount=126n*10n**18n;await game.getByRole('button',{name:'最新の報酬を確認',exact:true}).click();await game.getByText('未受取の報酬が増えたよ。貯金箱を見てみて！',{exact:true}).waitFor();
+ failed=true;await game.getByRole('button',{name:'最新の報酬を確認',exact:true}).click();await game.getByText('更新できませんでした。前回確認した数字を表示しています。',{exact:true}).waitFor();assert.equal(await game.getByTestId('claimable-rf').getByText('126',{exact:true}).count(),1);
+ failed=false;inactive=true;await game.getByRole('button',{name:'最新の報酬を確認',exact:true}).click();await game.getByText('現在は報酬停止中',{exact:true}).waitFor();
+ await page.locator('.rf-game-frame').screenshot({path:`./artifacts/piggy-panel-${width}.png`});await game.getByRole('button',{name:'閉じる',exact:true}).click();
+ await page.getByRole('button',{name:'Friend wallet',exact:true}).click();const link=page.getByRole('link',{name:'公式で確認・受取 ↗'});assert.equal(await link.getAttribute('href'),'https://rarefriends.com/portfolio');
+}}));
