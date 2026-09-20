@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { createWalletClient, custom, defineChain, formatEther, isAddress, parseAbi, parseUnits, zeroAddress, type Address, type EIP1193Provider } from "viem";
 import { GENERATION_SPRITE_MANIFEST } from "./generation-sprites.js";
 const WALLET_ABI = parseAbi(["function tokenBoundAccount(uint256 tokenId) view returns (address)"]);
-import { bindGameFrame, type GameArguments, type GameMethod } from "./frame-bridge.js";
+import { bindGameFrame, createPreviewLocalStore, type GameArguments, type GameMethod } from "./frame-bridge.js";
 import { GameFrame, type GameConfirmation, type GameFriend, type GameFrameProps } from "./game-frame.js";
 import { createGamePreview, maximumPrize, RF, type ChanceGameDefinition, type GameSnapshot, type GameClient, type PreviewGameClient } from "./game.js";
 import { createLiveGameClient, LIVE_GAME_MAX_ORACLE_FEE, type LiveGameDeployment, type LiveGameOptions } from "./live-game.js";
@@ -306,6 +306,16 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker }:
       catch (error) {
         channel.port1.close(); channel.port2.close(); clearTimeout(timeout);
         setSessionError(error instanceof Error ? error.message : "Invalid game deployment."); setStatus("error"); return;
+      }
+      if (activeClient.mode === "preview") {
+        activeClient = { ...activeClient, ...createPreviewLocalStore({
+          frameUrl: new URL(frameUrl, window.location.href).href,
+          friendId: friend.id, walletAddress: friend.walletAddress!,
+          storage: () => window.localStorage,
+          assertActive() {
+            if (!alive || epoch.current !== bridgeEpoch || bridge.current !== connection) throw new Error("Game session changed.");
+          },
+        }) };
       }
       clearTimeout(timeout);
       const connection = bindGameFrame(channel.port1, { client: activeClient, authorize,

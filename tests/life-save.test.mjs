@@ -54,3 +54,22 @@ test('trusted namespace separates games and NFTs, with active-session storage ch
   assert.equal(await make('https://game.test/a', 2n).loadLocal(), null);
   active = false; await assert.rejects(first.saveLocal('stale'), /session changed/); assert.deepEqual([...values.values()], ['first']);
 });
+test('raw callers cannot supply a key or use local storage from a chain session', async () => {
+  for (const mode of ['preview', 'chain']) {
+    const { port1, port2 } = new MessageChannel(); let writes = 0;
+    const host = bridge.bindGameFrame(port1, { client: { definition, mode, saveLocal: async () => { writes++; } }, authorize: async () => {} });
+    port2.start();
+    try {
+      const response = new Promise(resolve => { port2.onmessage = event => resolve(event.data); });
+      port2.postMessage({ type: 'friendsdk:request', id: 1, method: 'saveLocal', args: mode === 'chain' ? ['value'] : ['arbitrary-key', 'value'] });
+      assert.match((await response).error, mode === 'chain' ? /storage is unavailable/ : /Unsupported/); assert.equal(writes, 0);
+    } finally { host.close(); port2.close(); }
+  }
+});
+test('storage getter failures and write quotas reject rather than report a save', async () => {
+  for (const storage of [() => { throw Error('private-access-detail'); }, () => ({ getItem: () => null, setItem: () => { throw Error('private-quota-detail'); } })]) {
+    const local = bridge.createPreviewLocalStore({ frameUrl: 'https://game.test/a', friendId: 1n, walletAddress: '0xabc', storage, assertActive() {} });
+    const s = session(local);
+    try { await assert.rejects(s.frame.client.saveLocal('value'), { message: 'Local preview storage is unavailable.' }); } finally { s.close(); }
+  }
+});

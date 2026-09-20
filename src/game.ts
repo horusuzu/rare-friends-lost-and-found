@@ -14,6 +14,9 @@ export type GameSnapshot = Readonly<{
 /** Player actions; randomness and funding are provided separately by the platform. */
 export type GameClient = Readonly<{
   mode: 'preview' | 'chain'; definition: ChanceGameDefinition;
+  /** Optional browser-local preview data; not on-chain inventory or RF. */
+  loadLocal?: () => Promise<string | null>;
+  saveLocal?: (value: string) => Promise<void>;
   read(): Promise<GameSnapshot>;
   canBuy(quantity: bigint): Promise<boolean>;
   buy(quantity: bigint): Promise<void>;

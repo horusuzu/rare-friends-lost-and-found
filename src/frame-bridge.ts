@@ -1,13 +1,14 @@
 import type { ChanceGameDefinition, GameSnapshot, GameClient } from './game.js';
 
-export type GameMethod = 'read' | 'canBuy' | 'buy' | 'play' | 'settle' | 'redeem';
-export type GameArguments = readonly (bigint | number)[];
+export type GameMethod = 'read' | 'canBuy' | 'buy' | 'play' | 'settle' | 'redeem' | 'loadLocal' | 'saveLocal';
+export type GameArguments = readonly (bigint | number | string)[];
 const UINT256_MAX = (1n << 256n) - 1n;
 const quantity = (value: unknown) => typeof value === 'bigint' && value > 0n && value <= 99n;
-function valid(method: unknown, args: unknown, outcomes: number): args is (bigint | number)[] {
+function valid(method: unknown, args: unknown, outcomes: number): args is (bigint | number | string)[] {
   if (!Array.isArray(args)) return false;
   switch (method) {
-    case 'read': return args.length === 0;
+    case 'read': case 'loadLocal': return args.length === 0;
+    case 'saveLocal': return args.length === 1 && validLocalValue(args[0]);
     case 'canBuy': case 'buy': case 'play': return args.length === 1 && quantity(args[0]);
     case 'settle': return args.length === 1 && typeof args[0] === 'bigint' && args[0] > 0n && args[0] <= UINT256_MAX;
     case 'redeem': return args.length === 2 && Number.isInteger(args[0]) && args[0] >= 1 && args[0] <= outcomes && quantity(args[1]);
@@ -25,6 +26,7 @@ const PUBLIC_ACTION_ERRORS = new Set([
   'Dice fee exceeds the approved maximum. Keep this pending cast and review the fee before retrying.',
 ]);
 function publicError(error: unknown, method: GameMethod): string {
+  if (method === 'loadLocal' || method === 'saveLocal') return 'Local preview storage is unavailable.';
   if (error instanceof Error) {
     const transaction = error as Error & { code?: unknown; transactionHash?: unknown };
     if (transaction.name === 'ChanceTransactionError' && typeof transaction.transactionHash === 'string' &&
@@ -68,7 +70,7 @@ export function bindGameFrame(port: MessagePort, options: {
     if (busy) { send({ type: 'friendsdk:response', id, error: 'Another game action is pending.' }); return; }
     const method = request.method as GameMethod, args = request.args;
     const mutation = ['buy', 'play', 'redeem'].includes(method) || (method === 'settle' && options.client.mode === 'chain');
-    if (paused && mutation) {
+    if (paused && (mutation || method === 'saveLocal')) {
       send({ type: 'friendsdk:response', id, error: 'Close the host menu before playing.' }); return;
     }
     busy = true;
@@ -79,6 +81,14 @@ export function bindGameFrame(port: MessagePort, options: {
       if (!alive) return;
       let value: unknown;
       switch (method) {
+        case 'loadLocal':
+          if (options.client.mode !== 'preview' || !options.client.loadLocal) throw new Error('Storage unavailable');
+          value = await options.client.loadLocal();
+          if (value !== null && !validLocalValue(value)) throw new Error('Invalid stored preview');
+          break;
+        case 'saveLocal':
+          if (options.client.mode !== 'preview' || !options.client.saveLocal) throw new Error('Storage unavailable');
+          await options.client.saveLocal(args[0] as string); break;
         case 'read': value = await options.client.read(); break;
         case 'canBuy': value = await options.client.canBuy(args[0] as bigint); break;
         case 'buy': value = await options.client.buy(args[0] as bigint); break;
@@ -88,7 +98,7 @@ export function bindGameFrame(port: MessagePort, options: {
       }
       if (!alive) return;
       if (method === 'read') options.onSnapshot?.(value as GameSnapshot);
-      else if (options.client.mode === 'preview' && method !== 'canBuy') options.onSnapshot?.(await options.client.read());
+      else if (options.client.mode === 'preview' && method !== 'canBuy' && method !== 'loadLocal' && method !== 'saveLocal') options.onSnapshot?.(await options.client.read());
       send({ type: 'friendsdk:response', id, value });
     } catch (error) {
       if (alive) options.onError?.(error instanceof Error ? error : new Error('Game action failed.'), method);
@@ -132,9 +142,37 @@ export function createFrameGameClient(port: MessagePort, definition: ChanceGameD
     });
   }
   const client = Object.freeze<GameClient>({ mode, definition,
+    ...(mode === 'preview' ? { loadLocal: () => call<string | null>('loadLocal', []), saveLocal: (value: string) => call<void>('saveLocal', [value]) } : {}),
     read: () => call('read', []), canBuy: quantity => call('canBuy', [quantity]),
     buy: quantity => call('buy', [quantity]), play: (quantity = 1n) => call('play', [quantity]),
     settle: playId => call('settle', [playId]), redeem: (outcomeId, quantity) => call('redeem', [outcomeId, quantity]),
   });
   return { client, close };
+}
+
+const LOCAL_PREVIEW_LIMIT = 32 * 1024;
+function validLocalValue(value: unknown): value is string {
+  return typeof value === 'string' && value.length <= LOCAL_PREVIEW_LIMIT && new TextEncoder().encode(value).byteLength <= LOCAL_PREVIEW_LIMIT;
+}
+
+/** Trusted runtime only: a fixed game/NFT slot, never a child-selected storage key. */
+export function createPreviewLocalStore(options: {
+  frameUrl: string; friendId: bigint; walletAddress: string;
+  storage: () => Pick<Storage, 'getItem' | 'setItem'>;
+  assertActive: () => void;
+}): Required<Pick<GameClient, 'loadLocal' | 'saveLocal'>> {
+  const key = `friendsdk:local-preview:v1:${JSON.stringify([options.frameUrl, options.friendId.toString(), options.walletAddress.toLowerCase()])}`;
+  return {
+    async loadLocal() {
+      options.assertActive();
+      const value = options.storage().getItem(key);
+      if (value !== null && !validLocalValue(value)) throw new Error('Local preview storage is unavailable.');
+      return value;
+    },
+    async saveLocal(value) {
+      options.assertActive();
+      if (!validLocalValue(value)) throw new Error('Invalid local preview save.');
+      options.storage().setItem(key, value);
+    },
+  };
 }
