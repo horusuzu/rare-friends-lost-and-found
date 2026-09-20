@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { createWalletClient, custom, defineChain, formatEther, isAddress, parseAbi, parseUnits, zeroAddress, type Address, type EIP1193Provider } from "viem";
 import { GENERATION_SPRITE_MANIFEST } from "./generation-sprites.js";
 const WALLET_ABI = parseAbi(["function tokenBoundAccount(uint256 tokenId) view returns (address)"]);
+import { readFriendRewards } from './friend-rewards.js';
 import { bindGameFrame, createPreviewLocalStore, type GameArguments, type GameMethod } from "./frame-bridge.js";
 import { GameFrame, type GameConfirmation, type GameFriend, type GameFrameProps } from "./game-frame.js";
 import { createGamePreview, maximumPrize, RF, type ChanceGameDefinition, type GameSnapshot, type GameClient, type PreviewGameClient } from "./game.js";
@@ -189,11 +190,11 @@ function EligibilityGate({ definition, picker, friend, account, chainId, publicC
     ledgers.set(ledgerKey, client);
   }
   // Remount both the bridge and child on any identity/network/URL change.
-  return <EmbeddedSession key={frameUrl} picker={picker} friend={{ ...friend, kind: "owned", walletAddress: checked.walletAddress }} client={client} definition={definition} frameUrl={frameUrl} />;
+  return <EmbeddedSession key={frameUrl} picker={picker} friend={{ ...friend, kind: "owned", walletAddress: checked.walletAddress }} client={client} definition={definition} frameUrl={frameUrl} rewards={{ publicClient, account: account as Address }} />;
 }
 
-function EmbeddedSession({ friend, client, definition, live, frameUrl, picker }: {
-  friend: GameFriend; client?: GameClient; definition: ChanceGameDefinition; live?: LiveGameOptions; frameUrl: string; picker?: Picker;
+function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, rewards }: {
+  friend: GameFriend; client?: GameClient; definition: ChanceGameDefinition; live?: LiveGameOptions; frameUrl: string; picker?: Picker; rewards?: { publicClient: GenerationIdentityClient; account: Address };
 }) {
   const liveRef = useRef(live); liveRef.current = live;
   const mode = live ? "live" : "preview";
@@ -317,6 +318,15 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker }:
           },
         }) };
       }
+      if (rewards) {
+        const context = rewards;
+        activeClient = { ...activeClient, readRewards: async () => {
+          if (!alive || epoch.current !== bridgeEpoch) throw new Error('Game session changed.');
+          const value = await readFriendRewards(context.publicClient, { friendId: friend.id, account: context.account, walletAddress: friend.walletAddress as Address });
+          if (!alive || epoch.current !== bridgeEpoch) throw new Error('Game session changed.');
+          return value;
+        } };
+      }
       clearTimeout(timeout);
       const connection = bindGameFrame(channel.port1, { client: activeClient, authorize,
         onActionChange(value) { actionPending.current = value; if (alive) setTransactionPending(value); },
@@ -342,7 +352,7 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker }:
       bridge.current?.close(); bridge.current = null;
       pending.current?.();
     };
-  }, [client, definition, friend.id, attempt]);
+  }, [client, definition, friend.id, attempt, rewards?.publicClient, rewards?.account]);
 
   async function topUp() {
     if (fundingRef.current || actionPending.current || !liveRef.current) return;
@@ -371,7 +381,7 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker }:
       <button type="button" disabled={funding || transactionPending} onClick={() => { void topUp(); }}>{funding ? "Confirming transfer…" : "Transfer RF to Friend"}</button>
       {transactionPending && <p role="status">Finish the pending game action before transferring RF.</p>}
       {fundMessage && <p role="status">{fundMessage}</p>}
-    </div> : undefined}
+    </div> : rewards ? <div className="rf-runtime-connection"><p>実際の報酬の受取・アクティベートは公式サイトで行えます。このゲームから取引は送りません。</p><a href="https://rarefriends.com/portfolio" target="_blank" rel="noopener noreferrer">公式で確認・受取 ↗</a><p className="rf-frame-note">このパネルの demo RF はゲーム内の模擬残高です。実残高はおうちの貯金箱で確認してください。</p></div> : undefined}
     confirmation={confirmation} onMenuChange={onMenuChange} {...picker}>
     <iframe key={attempt} ref={iframe} src={frameUrl} title={definition.name} sandbox="allow-scripts" referrerPolicy="no-referrer" />
     {status !== "ready" && <div className="rf-runtime-status" role={status === "error" ? "alert" : "status"}>
