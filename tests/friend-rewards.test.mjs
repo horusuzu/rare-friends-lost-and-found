@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {readFriendRewards,REWARDS_DEPLOYMENT} from '../dist/friend-rewards.js';
+const owner='0x0000000000000000000000000000000000000011',wallet='0x0000000000000000000000000000000000000022';
+const options={friendId:42n,account:owner,walletAddress:wallet};
+function fixture(overrides={}){const calls=[];return {calls,client:{getChainId:async()=>4663,getBlockNumber:async()=>123n,readContract:async request=>{calls.push(request);if(overrides[request.functionName]!==undefined){if(overrides[request.functionName] instanceof Error)throw overrides[request.functionName];return overrides[request.functionName];}return {ownerOf:owner,generation:4,tokenBoundAccount:wallet,activationManager:REWARDS_DEPLOYMENT.manager,positions:[0,100n],retired:false,rf:REWARDS_DEPLOYMENT.rf,weth:REWARDS_DEPLOYMENT.weth,earned:request.args?.[0]===REWARDS_DEPLOYMENT.rf?123n:4n,balanceOf:request.address===REWARDS_DEPLOYMENT.rf?456n:7n}[request.functionName];}}};}
+test('same-block real rewards use NFT wallet and never merge holdings with earned',async()=>{const {calls,client}=fixture();const r=await readFriendRewards(client,options);assert.equal(r.active,true);assert.equal(r.claimableRF,123n);assert.equal(r.walletRF,456n);assert.equal(r.claimableWETH,4n);assert.equal(r.walletWETH,7n);assert.equal(r.blockNumber,123n);assert.ok(calls.every(c=>c.blockNumber===123n));assert.ok(calls.filter(c=>c.functionName==='balanceOf').every(c=>c.args[0]===wallet));});
+test('zero reward weight is inactive even when accrued rewards remain',async()=>{const {client}=fixture({positions:[0,0n]});const r=await readFriendRewards(client,options);assert.equal(r.active,false);assert.equal(r.claimableRF,123n);});
+test('RPC failures, changed owner, wrong network or changed deployment never become zero',async()=>{
+ for(const overrides of [{ownerOf:wallet},{generation:0},{tokenBoundAccount:owner},{activationManager:wallet},{retired:true},{rf:wallet},{weth:wallet},{earned:new Error('RPC unavailable')}]){const {client}=fixture(overrides);await assert.rejects(readFriendRewards(client,options));}
+ const {client}=fixture();client.getChainId=async()=>1;await assert.rejects(readFriendRewards(client,options));
+});
