@@ -19,4 +19,4 @@ Core gameplay is free and simulated. An optional 2 demo RF room-frame cosmetic u
 
 ## Status
 
-The island-life revision is being validated for publication. Contest filing remains pending the requested second holder playtest. Automated screenshots use fixture Friend #7730 and do not claim ownership of that NFT. The original SDK instructions remain below the project introduction in README.md and in AGENTS.md.
+The island-life revision is published at the preview URL. Contest filing remains pending the requested second holder playtest. Automated screenshots use fixture Friend #7730 and do not claim ownership of that NFT. The original SDK instructions remain below the project introduction in README.md and in AGENTS.md.

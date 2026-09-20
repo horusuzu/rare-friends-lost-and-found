@@ -11,6 +11,7 @@ This record covers the replacement of the 90-second delivery prototype with pers
 - Optional cosmetic journey passed at both sizes: cancel purchase, confirm through SDK, show cosmetic, reload retains care while clearing the session cosmetic.
 - Screenshots inspected at both sizes. Phone navigation sits above the trusted wallet toolbar.
 - Browser fixtures use Friend #7730, never a claimed builder NFT. Test helper checks opaque sandbox, fresh ownership reads and absence of signing methods.
+- Public-build smoke test: standalone manifest, decoded 512px icon and service-worker registration passed; no-wallet state has no playable iframe.
 - Bounded preview saves distinguish games/NFTs/canonical wallets, reject malformed/oversized requests and report unavailable/quota errors. Stale bridge sessions cannot save. Local saves do not grant ownership.
 
 The tested release was built from an isolated checkout of committed SDK sources plus this game's changes, preserving the previously verified RPC batching fix. Unrelated uncommitted reversions in the main working directory were not published or removed.
@@ -18,6 +19,8 @@ The tested release was built from an isolated checkout of committed SDK sources 
 ## Independent review
 
 One child implemented and tested the save boundary while the parent built the game, then reviewed the game and packaging. Review caught three issues: accessible button names, disabled controls in focus trapping, and lock state after client replacement. All were fixed. PWA caches are scope-specific. The extra review had concrete correctness benefits; no token savings were measured.
+
+Published GitHub Pages revision: `3e6698a`. Deployment succeeded; remote runtime.js, game.js, manifest and service worker match the tested release hashes.
 
 ## Limits
 
