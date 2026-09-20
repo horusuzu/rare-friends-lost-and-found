@@ -36,3 +36,13 @@ Phone tests are Chromium viewport tests, not a physical iPhone wallet/home-scree
 - No claims, signatures, activation changes, transfers or funds used.
 - Reward browser journeys pass at 390×844 and 1100×900: separate Genesis/Generations amounts, refresh increase feedback, stale-value indication on RPC error, inactive positions, and trusted official-portfolio link. These screenshots use mocked amounts, not the holder's actual balances.
 - Existing life/cosmetic/save/reload browser journeys also pass at both sizes after adding the piggy bank.
+
+## Selectable Genesis companion revision (2026-09-21)
+
+- Explicit holder request: raise Genesis #597 itself. Configured Genesis discovery is read-only and independent of Generations history; fresh ownership/canonical-wallet verification still precedes mounting the game. Genesis is disabled in live mode.
+- Canonical Genesis tokenURI properties were verified against the official deployment and live NFT #597. Numeric white-bit metadata becomes a doubled 16px portrait; external SVG/HTML is not inserted into the game.
+- Direct chain verification passed for Genesis #597 ownership, artwork, active position and collection-specific real rewards at block 68343237. No signatures, claims or transactions occurred.
+- Genesis browser journeys passed at 390×844 and 1100×900: picker, canonical portrait, feeding, naming, separate saves, switching to Generations and back, reload, and rejection when ownership changes after discovery. Wallet methods are read/connect-only; sandbox remains opaque.
+- Existing reward and full care/outing/postcard/build/sleep/save browser journeys passed at both sizes. SDK build, SDK/game TypeScript checks passed.
+- Identity/artwork/reward reader coverage: 100% lines/functions, 98.67% branches; enforced minimum 80%. Storage regression confirms an identical token ID and wallet cannot collide across collections, while legacy Generations save keys stay unchanged.
+- One independent reviewer examined ownership, collection isolation and live-mode restrictions while parent ran browser tests; no concrete issues found. No token-saving claim is made.

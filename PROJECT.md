@@ -1,6 +1,6 @@
 # Rare Friends: Our Little Island / 島ぐらし
 
-A persistent companion and island-building prototype by a Genesis holder. Name your verified Generations Friend, share meals, choose how to spend outings, and turn collected materials into a home and island with memories.
+A persistent companion and island-building prototype by a Genesis holder. Name your verified Genesis #597 or Generations Friend, share meals, choose how to spend outings, and turn collected materials into a home and island with memories.
 
 The former Lost & Found delivery game was played with the builder's own eligible NFT. Their feedback—little attachment and too little life together—led to this replacement. The public URL and source directory remain stable.
 
@@ -22,3 +22,5 @@ Core gameplay is free and simulated. An optional 2 demo RF room-frame cosmetic u
 ## Status
 
 The island-life revision is published at the preview URL. Contest filing remains pending the requested second holder playtest. Automated screenshots use fixture Friend #7730 and do not claim ownership of that NFT. The original SDK instructions remain below the project introduction in README.md and in AGENTS.md.
+
+The user-authorized Genesis preview extension verifies Genesis ownership directly, uses canonical Genesis pixels, and keeps collection-specific care saves. Genesis #597 can be selected without a Generations NFT. Other SDK games and live deployments retain the original eligibility rules.

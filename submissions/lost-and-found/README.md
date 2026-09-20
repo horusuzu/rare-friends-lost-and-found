@@ -12,13 +12,13 @@ Draft — not yet filed. The first delivery prototype passed a holder playtest t
 
 ## The experience
 
-Your own verified Generations NFT becomes a companion. Give it a name, discover its favorite food, go for walks, and choose how to spend time at the beach, forest, bakery plaza or lighthouse. Each outing offers two choices with different materials and friendship gains. Bring home a personal postcard, grow flowers, build a shared bench, and construct a bridge to reach the lighthouse.
+Your own verified Genesis #597 or Generations NFT becomes a companion. Give it a name, discover its favorite food, go for walks, and choose how to spend time at the beach, forest, bakery plaza or lighthouse. Each outing offers two choices with different materials and friendship gains. Bring home a personal postcard, grow flowers, build a shared bench, and construct a bridge to reach the lighthouse.
 
 The room changes as you live together. The Friend remembers previous outings in its greeting; its journal and eight collectible postcards record your choices. Sleeping advances the game to the next morning and grows the garden. No countdown or neglect penalty demands attention. Stories and scenery are original fiction, not official Rare Friends lore.
 
 ## Try it
 
-Connect a compatible browser wallet holding a Generations NFT (generation >=1) on Robinhood mainnet, chain 4663. Select your Friend in the SDK. Genesis alone is insufficient. No signatures or funds are needed.
+Connect a compatible browser wallet owning Genesis #597 or a Generations NFT (generation >=1) on Robinhood mainnet, chain 4663. Select your NFT in the SDK. This custom companion preview explicitly extends the upstream Generations-only gate for the configured Genesis; all ownership reads remain real and all gameplay remains simulated. No signatures or funds are needed.
 
 The interface is Japanese-first: おうち = Home, おでかけ = Outings, 島づくり = Build, 思い出 = Memories. On Home, choose ごはん to feed or おやすみ to advance a day. Visit the shore, pick a choice, and return home with materials. Build 小さな花畑 (garden), sleep, and pick the flowers; build 灯台への橋 (bridge) to unlock the fourth destination. Settings lets you rename the Friend.
 

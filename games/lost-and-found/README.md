@@ -1,6 +1,6 @@
 # Rare Friends: Our Little Island / 島ぐらし
 
-A phone-first companion and island-building game. Your verified Generations NFT lives with you: choose food, take walks, make choices on outings, bring materials and postcards home, and build a small island together. This replaces the former 90-second delivery prototype after its holder playtest.
+A phone-first companion and island-building game. Your verified Genesis #597 or Generations NFT lives with you: choose food, take walks, make choices on outings, bring materials and postcards home, and build a small island together. This replaces the former 90-second delivery prototype after its holder playtest.
 
 ## Play loop
 
@@ -14,7 +14,7 @@ A phone-first companion and island-building game. Your verified Generations NFT 
 
 Node 22+: `npm ci`, `npm run build`, then `node scripts/dev-game.mjs dev games/lost-and-found` for development. For public home-screen packaging: `node scripts/build-island-life.mjs /path/to/NEW-empty-directory`. Use a new dedicated output directory each build (the PWA packager adds nonstandard files after the SDK build).
 
-Requires a browser wallet holding a Generations NFT of generation >= 1 on Robinhood mainnet (4663). Genesis alone is not eligible. Ownership is freshly verified by the SDK; no signatures or real RF funding are needed. The opaque iframe sandbox remains intact.
+Requires a browser wallet owning Genesis #597 or a Generations NFT of generation >= 1 on Robinhood mainnet (4663). The holder explicitly requested Genesis companion play; this game opts in with `allowGenesisPreview: true`. The picker checks the configured Genesis #597 directly, not all Genesis IDs. Ownership is freshly verified by the SDK; no signatures or real RF funding are needed. The opaque iframe sandbox remains intact.
 
 ## Persistence and mobile
 
@@ -36,7 +36,7 @@ Original room, scenery, app icon and stories. Canonical selected NFT sprites fro
 
 ## Real reward piggy bank
 
-The room's piggy bank reads actual claimable RF/WETH and canonical NFT-wallet balances, separately from the preview economy. The selected Generations NFT is reverified at a fresh block. This builder's configured `linkedGenesisId: "597"` appears separately only when its `ownerOf` matches the same connected owner. No collection enumeration or additional playable identity is added.
+The room's piggy bank reads actual claimable RF/WETH and canonical NFT-wallet balances, separately from the preview economy. The selected NFT is reverified at a fresh block using its own collection. This builder's configured `linkedGenesisId: "597"` appears separately only when its `ownerOf` matches the same connected owner. When Genesis itself is selected, only its own rewards are shown, without a duplicate linked entry. Genesis uses canonical tokenURI pixel metadata; its save namespace is separate, and existing Generations saves are retained. Live game actions remain unavailable for Genesis.
 
 All reads for both NFTs share that block. Contract bindings, retirement and token addresses are checked against the official deployment. A failed read is never presented as zero; a previous successful snapshot remains explicitly timestamped. The small celebration compares successive successful claimable amounts, never wallet deposits, and makes no yield forecast. Both tokens use 18 decimals; display arithmetic stays bigint.
 

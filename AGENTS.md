@@ -1,5 +1,18 @@
 # Build with FriendSDK
 
+## User-authorized island preview exception (2026-09-21)
+
+The holder explicitly requested selecting and raising Genesis #597 itself. For
+`games/lost-and-found` only, `allowGenesisPreview: true` opts into verified Genesis
+companion play and supersedes the Generations-only prototype identity requirement
+below. The trusted host checks the configured `linkedGenesisId` owner and canonical
+wallet at a fresh block; Genesis never calls `generation()`. No activation is
+required for care. Live deployments still reject Genesis. Keep collection-specific
+identity, artwork, rewards, and saves; all other sandbox and simulated-economy rules
+remain applicable. Do not remove ordinary Generations eligibility or broaden this
+exception to live game contracts.
+
+
 ## Build the requested experience
 
 Choose the interface and mechanics that fit the idea. Walkable worlds, cards,
