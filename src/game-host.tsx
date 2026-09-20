@@ -28,7 +28,7 @@ export type GameHostProps = {
 /** Complete game runtime: connection, owned Friends, verification, frame and confirmations. */
 export function GameHost({ walletProvider, publicClient, ...props }: GameHostProps) {
   const [connection, setConnection] = useState<{ provider: FriendWalletProvider | undefined; session: FriendWalletSession } | null>(null);
-  const [defaultClient] = useState(() => createFriendPublicClient({ batch: Boolean(props.deployment) }));
+  const [defaultClient] = useState(() => createFriendPublicClient());
   useEffect(() => {
     const session = createFriendWalletSession({ provider: walletProvider });
     setConnection({ provider: walletProvider, session });

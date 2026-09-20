@@ -27,7 +27,10 @@ export type FriendWalletSessionOptions = Readonly<{
 
 /** SDK defaults are public read-only infrastructure; no account, signer or API key is needed. */
 export function createFriendPublicClient(options: { rpcUrl?: string; batch?: boolean } = {}): PublicClient {
-  return createPublicClient({ transport: http(options.rpcUrl ?? GENERATION_SPRITE_MANIFEST.rpcUrl, { batch: options.batch ? { wait: 50, batchSize: 50 } : false }), cacheTime: 0, pollingInterval: 1_000 });
+  return createPublicClient({ transport: http(options.rpcUrl ?? GENERATION_SPRITE_MANIFEST.rpcUrl, {
+    batch: options.batch !== false ? { wait: 50, batchSize: 50 } : false,
+    retryCount: 3, retryDelay: 1_000,
+  }), cacheTime: 0, pollingInterval: 1_000 });
 }
 
 function isProvider(value: unknown): value is FriendWalletProvider {

@@ -6,6 +6,8 @@ export * from "./generation-sprites.js";
 
 export function createFriendReader() {
   return createGenerationSpriteReader(createPublicClient({
-    transport: http(GENERATION_SPRITE_MANIFEST.rpcUrl, { retryCount: 1, timeout: 12_000 }),
+    transport: http(GENERATION_SPRITE_MANIFEST.rpcUrl, {
+      batch: { wait: 50, batchSize: 50 }, retryCount: 3, retryDelay: 1_000, timeout: 12_000,
+    }),
   }));
 }
