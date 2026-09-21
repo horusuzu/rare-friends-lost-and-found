@@ -52,3 +52,9 @@ test('care feedback and malformed storage edge cases',()=>{
  assert.equal(restore(null,'77251'),null); assert.equal(restore('x'.repeat(32001),'77251'),null);
  for(const patch of [{day:0},{projects:['bad']},{projects:['garden','garden']},{choice:2},{choice:0},{bag:{}},{bag:{wood:5,seeds:0,shells:0}},{journal:[{day:0,text:'x'}]},{cards:[{id:'beach-0',place:'beach',choice:0,day:1,title:'ok',text:7}]},{name:''},{gardenReady:'yes'}]) assert.equal(restore(JSON.stringify({...s,...patch}),'77251'),null);
 });
+test('language preference survives save without changing progress; legacy saves work and invalid locales fail',()=>{
+ const original=act(start(),'walk'), saved={...original,language:'en'};
+ assert.equal(restore(JSON.stringify(saved),original.friendId)?.language,'en');
+ assert.equal(restore(JSON.stringify(original),original.friendId)?.bond,original.bond);
+ assert.equal(restore(JSON.stringify({...saved,language:'xx'}),original.friendId),null);
+});
