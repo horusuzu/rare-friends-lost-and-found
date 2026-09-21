@@ -16,4 +16,8 @@ for(const width of [390,1100])console.log(await testGame('./games/lost-and-found
  failed=false;inactive=true;await game.getByRole('button',{name:'最新の報酬を確認',exact:true}).click();await game.getByText('現在は報酬停止中',{exact:true}).first().waitFor();
  await game.locator('.life-dialog').evaluate(el=>el.scrollTop=0);await page.locator('.rf-game-frame').screenshot({path:`./artifacts/piggy-panel-${width}.png`});await game.getByRole('button',{name:'閉じる',exact:true}).click();
  await page.getByRole('button',{name:'Open Friend wallet',exact:true}).click();const link=page.getByRole('link',{name:'公式で確認・受取 ↗'});assert.equal(await link.getAttribute('href'),'https://rarefriends.com/portfolio');await page.getByRole('button',{name:'Close Friend wallet',exact:true}).click();await game.locator('.life-app').evaluate(el=>el.scrollTop=0);
+ await game.getByRole('button',{name:'English',exact:true}).click();
+ await game.locator('.home-piggy').click();await game.getByTestId('genesis-claimable-rf').getByText('126',{exact:true}).waitFor();
+ assert.doesNotMatch(await game.locator('.reward-panel').innerText().then(s=>s.replace('公式で確認・受取','')),/[\u3040-\u30ff\u4e00-\u9fff]/,'Reward panel is in English');
+ await game.getByRole('button',{name:'Close',exact:true}).click();
 }}));

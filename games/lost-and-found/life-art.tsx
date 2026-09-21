@@ -1,11 +1,13 @@
+import {translate,type Language} from './life-i18n.js';
 import type { GenerationSprites } from '@rarefriends/friendsdk/sprites';
 import { FriendPixels } from './art.js';
 import {PiggyIcon} from './reward-panel.js';
 import type { Life, Card } from './life.js';
-export function LifeScene({life,sprites,reaction,onPet,onBank,bankDisabled}:{life:Life;sprites:GenerationSprites;reaction:string;onPet:()=>void;onBank?:()=>void;bankDisabled?:boolean}) {
+export function LifeScene({life,sprites,reaction,onPet,onBank,bankDisabled,language='ja'}:{language?:Language;life:Life;sprites:GenerationSprites;reaction:string;onPet:()=>void;onBank?:()=>void;bankDisabled?:boolean}) {
+ const t=(text:string)=>translate(text,language);
  const place=life.location,home=place==='home',sea=place==='beach'||place==='lighthouse';
  return <div className={`life-scene scene-${place} reaction-${reaction}`}>
-  <svg viewBox="0 0 600 350" role="img" aria-label={home?'少しずつ育つ、ふたりのおうち':'Friendと訪れた島の風景'}>
+  <svg viewBox="0 0 600 350" role="img" aria-label={home?t("少しずつ育つ、ふたりのおうち"):t("Friendと訪れた島の風景")}>
    <defs><pattern id="wall" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M12 9v6M9 12h6" stroke="#bdcebd" opacity=".4"/></pattern></defs>
    <rect width="600" height="350" fill={home?'#ebedcf':sea?'#c7e4e3':'#d8e9cf'}/>
    {home?<>
@@ -29,18 +31,28 @@ export function LifeScene({life,sprites,reaction,onPet,onBank,bankDisabled}:{lif
    {home&&life.projects.includes('picnic')&&<g transform="translate(169 216)"><path d="M0 5h54v11H0zm5-20h44V0H5z" fill="#a37957"/><path d="M8 16v15m38-15v15" stroke="#766a51" strokeWidth="5"/></g>}
    {home&&life.projects.includes('garden')&&<g transform="translate(552 280)"><ellipse rx="29" ry="10" fill="#9f8461"/>{[-15,0,15].map(x=><g key={x} transform={`translate(${x} 0)`}><path d="M0 0v-20" stroke="#6c8d5b" strokeWidth="3"/><circle cy="-22" r="7" fill={life.gardenReady?'#e8a393':'#9fb77b'}/></g>)}</g>}
   </svg>
-  <button className="living-friend" type="button" onClick={onPet} aria-label={`${life.name}に話しかける`}><span className="friend-emote">{reaction==='eat'?'♡':reaction==='sleep'?'z z':reaction==='walk'?'♪':'♡'}</span><FriendPixels sprites={sprites} size={120}/><span className="pixel-shadow"/></button>
-  {home&&onBank&&<button type="button" className="scene-piggy" aria-label="部屋の貯金箱" disabled={bankDisabled} onClick={onBank}><PiggyIcon/></button>}
+  <button className="living-friend" type="button" onClick={onPet} aria-label={t(`${life.name}に話しかける`)}><span className="friend-emote">{reaction==='eat'?'♡':reaction==='sleep'?'z z':reaction==='walk'?'♪':'♡'}</span><FriendPixels sprites={sprites} size={120}/><span className="pixel-shadow"/></button>
+  {home&&onBank&&<button type="button" className="scene-piggy" aria-label={t("部屋の貯金箱")} disabled={bankDisabled} onClick={onBank}><PiggyIcon/></button>}
   <span className="scene-label">{home?'OUR LITTLE HOME':place==='beach'?'SALT AIR & SMALL TREASURES':place==='forest'?'TAKE THE LONG WAY HOME':place==='plaza'?'WARM BREAD, WARM COMPANY':'A BRIDGE WE BUILT TOGETHER'}</span>
  </div>;
 }
-export function memoryImage(card:Card,life:Life,sprites:GenerationSprites):string {
- const c=document.createElement('canvas');c.width=1000;c.height=740;const x=c.getContext('2d');if(!x)throw new Error('画像を作れませんでした。');
+export function memoryImage(card:Card,life:Life,sprites:GenerationSprites,language:Language='ja'):string {
+ const t=(text:string)=>translate(text,language);
+ const c=document.createElement('canvas');c.width=1000;c.height=740;const x=c.getContext('2d');if(!x)throw new Error(t("画像を作れませんでした。"));
  x.fillStyle='#faf3df';x.fillRect(0,0,1000,740);x.strokeStyle='#93aa8d';x.lineWidth=3;x.strokeRect(28,28,944,684);
  x.fillStyle=card.place==='forest'?'#bfcea8':'#bdd8d1';x.fillRect(55,55,890,360);x.fillStyle='#ecdfb1';x.beginPath();x.ellipse(500,365,360,55,0,0,Math.PI*2);x.fill();
  x.fillStyle='#f7d687';x.beginPath();x.arc(790,137,37,0,Math.PI*2);x.fill();
  x.fillStyle='#35584b';sprites.clips.idle.down[0].rows.forEach((row,y)=>[...row].forEach((p,col)=>{if(p==='#')x.fillRect(390+col*12,176+y*12,12,12);}));
- x.fillStyle='#38584b';x.font='bold 32px sans-serif';x.fillText(card.title,65,480);x.font='22px sans-serif';x.fillText(`${life.name}と過ごした ${card.day}日目`,65,524);
- x.font='20px sans-serif';const chars=[...card.text];for(let i=0;i<chars.length;i+=37)x.fillText(chars.slice(i,i+37).join(''),65,570+Math.floor(i/37)*32);
+ x.fillStyle='#38584b';x.font='bold 32px sans-serif';x.fillText(t(card.title),65,480,870);x.font='22px sans-serif';x.fillText(t(`${life.name}と過ごした ${card.day}日目`),65,524);
+ x.font='20px sans-serif';
+ const text=t(card.text);
+ if(language==='en'){
+  let line='',row=0;
+  for(const word of text.split(/\s+/)){
+   const next=line?`${line} ${word}`:word;
+   if(line&&x.measureText(next).width>870){x.fillText(line,65,570+row*32);row++;line=word;}else line=next;
+  }
+  if(line)x.fillText(line,65,570+row*32);
+ }else{const chars=[...text];for(let i=0;i<chars.length;i+=37)x.fillText(chars.slice(i,i+37).join(''),65,570+Math.floor(i/37)*32);}
  x.font='15px monospace';x.fillText(`${sprites.collection === "genesis" ? "GENESIS" : "FRIEND"} #${life.friendId} / OUR LITTLE ISLAND / PERSONAL KEEPSAKE`,65,680);return c.toDataURL('image/png');
 }
