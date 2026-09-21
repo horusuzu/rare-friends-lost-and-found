@@ -5,6 +5,7 @@ export type Bag = { wood: number; shells: number; seeds: number };
 export type Memory = { day: number; text: string };
 export type Card = { id: string; place: Exclude<Place,'home'>; choice: number; day: number; title: string; text: string };
 export type Life = {
+ language?: 'ja' | 'en';
  version: 2; friendId: string; name: string; favorite: Food; day: number; hunger: number; energy: number; bond: number;
  wood: number; shells: number; seeds: number; flowers: number; projects: Project[]; gardenReady: boolean;
  location: Place; choice: number | null; bag: Bag; cards: Card[]; journal: Memory[]; message: string; outings: number;
@@ -74,6 +75,7 @@ export function restore(raw:string|null,friendId:string):Life|null {
  if(!raw||raw.length>32000)return null;
  try {
   const s=JSON.parse(raw) as Life;
+  if(s?.language !== undefined && s.language !== 'ja' && s.language !== 'en')return null;
   if(!s||s.version!==2||s.friendId!==friendId||typeof s.name!=='string'||!s.name.trim()||s.name.length>20||!['toast','berry','soup'].includes(s.favorite)||!['home',...Object.keys(PLACES)].includes(s.location))return null;
   for(const k of ['day','hunger','energy','bond','wood','shells','seeds','flowers','outings'] as const) if(!Number.isSafeInteger(s[k])||s[k]<0||s[k]>1e9)return null;
   if(s.day<1||s.hunger>100||s.energy>100||typeof s.gardenReady!=='boolean'||typeof s.message!=='string'||s.message.length>600)return null;
