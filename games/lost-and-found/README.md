@@ -43,3 +43,7 @@ All reads for both NFTs share that block. Contract bindings, retirement and toke
 Sources: https://rarefriends.com/api/protocol/config and https://rarefriends.com/docs/contracts (checked 2026-09-21). The trusted host exposes only argument-free `readRewards()`. Its RPC does not block care saves. No claims, activation, signing, transfers or funding occur. The host's **Friend wallet → 公式で確認・受取** link opens the official portfolio; the sandbox retains `allow-scripts` only.
 
 Browser tests: `node games/lost-and-found/rewards-browser.test.mjs`. Unit tests: `node --test tests/friend-rewards.test.mjs tests/reward-bridge.test.mjs` after SDK build. Additional real RPC verification used the holder's selected Friend and Genesis; no owner address is stored in game source or save files.
+
+## Language
+
+Use **English / 日本語** at the top of the game to switch all care menus, dialogue, outings, journal entries, postcard exports and reward explanations. The choice is saved with this NFT’s local care data. Existing saves default to Japanese and retain their progress and custom nickname; stored memories are translated for display without rewriting them.

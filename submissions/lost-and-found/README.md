@@ -20,7 +20,7 @@ The room changes as you live together. The Friend remembers previous outings in 
 
 Connect a compatible browser wallet owning Genesis #597 or a Generations NFT (generation >=1) on Robinhood mainnet, chain 4663. Select your NFT in the SDK. This custom companion preview explicitly extends the upstream Generations-only gate for the configured Genesis; all ownership reads remain real and all gameplay remains simulated. No signatures or funds are needed.
 
-The interface is Japanese-first: おうち = Home, おでかけ = Outings, 島づくり = Build, 思い出 = Memories. On Home, choose ごはん to feed or おやすみ to advance a day. Visit the shore, pick a choice, and return home with materials. Build 小さな花畑 (garden), sleep, and pick the flowers; build 灯台への橋 (bridge) to unlock the fourth destination. Settings lets you rename the Friend.
+The interface supports English and Japanese using the **English / 日本語** button at the top, with the choice saved per NFT. Japanese labels: おうち = Home, おでかけ = Outings, 島づくり = Build, 思い出 = Memories. On Home, choose ごはん to feed or おやすみ to advance a day. Visit the shore, pick a choice, and return home with materials. Build 小さな花畑 (garden), sleep, and pick the flowers; build 灯台への橋 (bridge) to unlock the fourth destination. Settings lets you rename the Friend.
 
 ## Real reward piggy bank
 

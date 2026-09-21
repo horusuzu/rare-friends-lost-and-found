@@ -46,3 +46,7 @@ Phone tests are Chromium viewport tests, not a physical iPhone wallet/home-scree
 - Existing reward and full care/outing/postcard/build/sleep/save browser journeys passed at both sizes. SDK build, SDK/game TypeScript checks passed.
 - Identity/artwork/reward reader coverage: 100% lines/functions, 98.67% branches; enforced minimum 80%. Storage regression confirms an identical token ID and wallet cannot collide across collections, while legacy Generations save keys stay unchanged.
 - One independent reviewer examined ownership, collection isolation and live-mode restrictions while parent ran browser tests; no concrete issues found. No token-saving claim is made.
+
+## Bilingual interface revision
+
+English/Japanese toggle, translated existing memories, English outing/card/settings flow, nickname preservation, saved locale after reload, and switching back pass at 390×844 and 1100×900. English reward panels and existing Japanese care journeys also pass. Model/catalogue coverage is 100% lines/functions and 97.53% branches with 80% enforcement. Game typecheck, schema validation and static build pass. Independent catalogue author reviewed integration and identified label spacing, fixed before release. No wallet or reward accounting changes.
