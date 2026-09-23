@@ -6,8 +6,8 @@ Built with FriendSDK 0.1.2, React and a deterministic Canvas game engine.
 ## Play
 
 Connect through the SDK host and choose an owned Generations NFT (generation 1+).
-The host checks current ownership on Robinhood Chain (4663); Genesis companions
-are not enabled for this game. Wallet connection and read-only checks require no
+Or choose Genesis #597. The host checks current collection-specific ownership
+on Robinhood Chain (4663), including activated Genesis. Wallet connection and read-only checks require no
 transaction or signature. Choose Japanese or English, then launch.
 
 - Move: arrow keys or A / D; touch players hold the left/right buttons.

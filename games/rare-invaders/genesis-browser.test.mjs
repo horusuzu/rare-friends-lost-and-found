@@ -13,7 +13,7 @@ for(const width of [390,1100]){
  await page.getByRole('button',{name:/^Genesis #597/}).waitFor();await page.getByRole('button',{name:/^Friend #7730/}).waitFor();
  await page.getByRole('button',{name:/^Genesis #597/}).click();
  await game.getByRole('button',{name:'出撃する',exact:true}).click();assert.ok(fixture.genesisReads>=2);
- await game.getByRole('img',{name:'Genesis #597',exact:true}).waitFor({state:'attached'});
+ await game.getByRole('img',{name:'Genesis #597',exact:true,includeHidden:true}).waitFor({state:'attached'});
  await game.getByRole('button',{name:'一時停止',exact:true}).click();await game.getByRole('heading',{name:'PAUSED',exact:true}).waitFor();
  await page.getByRole('button',{name:'Choose Friend',exact:true}).click();await page.getByRole('button',{name:/^Friend #7730/}).click();await game.getByRole('button',{name:'出撃する',exact:true}).waitFor();
  await page.getByRole('button',{name:'Choose Friend',exact:true}).click();fixture.genesisOwner=SECOND_OWNER;await page.getByRole('button',{name:/^Genesis #597/}).click();await page.getByText('このウォレットは選択したGenesisを所有していません。',{exact:true}).waitFor();assert.equal(await page.locator('iframe').count(),0);
