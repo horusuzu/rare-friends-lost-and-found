@@ -24,6 +24,7 @@ export type GameClient = Readonly<{
   /** Optional browser-local preview data; not on-chain inventory or RF. */
   loadLocal?: () => Promise<string | null>;
   saveLocal?: (value: string) => Promise<void>;
+  shareScore?: (score: number, wave: number, status: 'over' | 'won', language: 'ja' | 'en') => Promise<void>;
   readRewards?: () => Promise<FriendRewardsSnapshot>;
   read(): Promise<GameSnapshot>;
   canBuy(quantity: bigint): Promise<boolean>;

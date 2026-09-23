@@ -1,6 +1,6 @@
 import type { ChanceGameDefinition, GameSnapshot, GameClient } from './game.js';
 
-export type GameMethod = 'read' | 'canBuy' | 'buy' | 'play' | 'settle' | 'redeem' | 'loadLocal' | 'saveLocal' | 'readRewards';
+export type GameMethod = 'read' | 'canBuy' | 'buy' | 'play' | 'settle' | 'redeem' | 'loadLocal' | 'saveLocal' | 'readRewards' | 'shareScore';
 export type GameArguments = readonly (bigint | number | string)[];
 const UINT256_MAX = (1n << 256n) - 1n;
 const quantity = (value: unknown) => typeof value === 'bigint' && value > 0n && value <= 99n;
@@ -8,6 +8,7 @@ function valid(method: unknown, args: unknown, outcomes: number): args is (bigin
   if (!Array.isArray(args)) return false;
   switch (method) {
     case 'read': case 'loadLocal': case 'readRewards': return args.length === 0;
+    case 'shareScore': return args.length === 4 && Number.isSafeInteger(args[0]) && args[0] >= 0 && args[0] < 1e9 && Number.isInteger(args[1]) && args[1] >= 1 && args[1] <= 5 && ['over','won'].includes(args[2]) && ['ja','en'].includes(args[3]);
     case 'saveLocal': return args.length === 1 && validLocalValue(args[0]);
     case 'canBuy': case 'buy': case 'play': return args.length === 1 && quantity(args[0]);
     case 'settle': return args.length === 1 && typeof args[0] === 'bigint' && args[0] > 0n && args[0] <= UINT256_MAX;
@@ -53,6 +54,7 @@ function publicError(error: unknown, method: GameMethod): string {
 /** Trusted host only. Transfer the other port to the exact sandboxed iframe window. */
 export function bindGameFrame(port: MessagePort, options: {
   client: GameClient;
+  onShareScore?: (result: import("./score-share.js").ScoreShare) => void;
   authorize: (method: GameMethod, args: GameArguments) => Promise<void>;
   onSnapshot?: (snapshot: GameSnapshot) => void;
   onError?: (error: Error, method: GameMethod) => void;
@@ -67,6 +69,11 @@ export function bindGameFrame(port: MessagePort, options: {
     const id = Number(request.id); lastId = id;
     if (!valid(request.method, request.args, options.client.definition.outcomes.length)) {
       send({ type: 'friendsdk:response', id, error: 'Unsupported game action.' }); return;
+    }
+    if (request.method === 'shareScore') {
+      if (paused || options.client.mode !== 'preview' || !options.onShareScore) { send({ type: 'friendsdk:response', id, error: paused ? 'Close the host menu before playing.' : 'Score sharing unavailable.' }); return; }
+      options.onShareScore(request.args as unknown as import('./score-share.js').ScoreShare);
+      send({ type: 'friendsdk:response', id }); return;
     }
     // This read never holds the simulated-ledger lock: closing the panel must not
     // strand a care save while a public RPC is slow. Only one reward read at a time.
@@ -157,6 +164,7 @@ export function createFrameGameClient(port: MessagePort, definition: ChanceGameD
   }
   const client = Object.freeze<GameClient>({ mode, definition,
     ...(mode === 'preview' ? { loadLocal: () => call<string | null>('loadLocal', []), saveLocal: (value: string) => call<void>('saveLocal', [value]) } : {}),
+    shareScore: (score, wave, status, language) => call('shareScore', [score,wave,status,language]),
     readRewards: () => call('readRewards', []),
     read: () => call('read', []), canBuy: quantity => call('canBuy', [quantity]),
     buy: quantity => call('buy', [quantity]), play: (quantity = 1n) => call('play', [quantity]),
