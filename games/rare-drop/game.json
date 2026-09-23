@@ -1,0 +1,14 @@
+{
+  "name": "Rare Drop",
+  "consumable": "Unused arcade schema placeholder",
+  "price": "1",
+  "outcomes": [
+    {
+      "name": "Unused; no token payout",
+      "chanceBps": 10000,
+      "reward": "1"
+    }
+  ],
+  "linkedGenesisId": "597",
+  "allowGenesisPreview": true
+}

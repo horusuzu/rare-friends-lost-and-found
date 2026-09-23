@@ -3,7 +3,7 @@
 ## User-authorized island preview exception (2026-09-21)
 
 The holder explicitly requested selecting and raising Genesis #597 itself. For
-`games/lost-and-found` and `games/rare-invaders` (user requested Genesis play on 2026-09-23), `allowGenesisPreview: true` opts into verified Genesis
+`games/lost-and-found`, `games/rare-invaders` (user requested Genesis play on 2026-09-23) and `games/rare-drop` (same holder, 2026-09-24), `allowGenesisPreview: true` opts into verified Genesis
 companion play and supersedes the Generations-only prototype identity requirement
 below. The trusted host checks the configured `linkedGenesisId` owner and canonical
 wallet at a fresh block; Genesis never calls `generation()`. No activation is
