@@ -8,8 +8,12 @@ for(const [width,height] of sizes)console.log(await testGame('./games/rare-drop'
  assert.ok(drop.y+drop.height<=wallet.y+1,'game controls must not overlap host controls');assert.ok(wallet.y+wallet.height<=height,'host controls within screen');assert.ok(drop.height>=44);
  // Keyboard: pause/resume keeps state.
  await game.getByRole('button',{name:'一時停止',exact:true}).click();await game.getByRole('heading',{name:'PAUSED',exact:true}).waitFor();await game.getByRole('button',{name:'再開する',exact:true}).click();
+ // NEXT must be the orb that appears in the dropper after each drop (compare canvas colour at the dropper row).
+ const FILLS=['#ff9db1','#ffbd76','#ffe26f','#a3e86a','#63d8c4'];const frame=page.frames().find(f=>f!==page.mainFrame());
+ const held=()=>frame.evaluate(FILLS=>{const row=document.querySelector('.screen canvas').getContext('2d').getImageData(0,80,400,1).data;const n=FILLS.map(f=>{const q=[1,3,5].map(k=>parseInt(f.slice(k,k+2),16));let c=0;for(let x=0;x<400;x++)if(q.every((v,j)=>Math.abs(v-row[x*4+j])<6))c++;return c;});return Math.max(...n)?n.indexOf(Math.max(...n))+1:0;},FILLS);
+ for(let i=0;i<4;i++){const next=Number(await game.getByTestId('next-tier').getAttribute('data-tier'));await game.getByRole('button',{name:'落とす',exact:true}).click();await page.clock.runFor(700);const got=await held();assert.equal(got,next,'NEXT preview matches the orb that arrives');}
  // Tap the jar to drop at a pointer position, then use the DROP button and keyboard.
- const jar=game.locator('canvas');const box=await jar.boundingBox();
+ const jar=game.locator('.screen canvas');const box=await jar.boundingBox();
  await jar.click({position:{x:box.width*.3,y:box.height*.3}});await page.clock.runFor(700);
  await game.getByRole('button',{name:'落とす',exact:true}).click();await page.clock.runFor(700);
  await jar.focus();await page.keyboard.press('Space');await page.clock.runFor(700);

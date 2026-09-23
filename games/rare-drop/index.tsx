@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import type { GameComponentProps } from '@rarefriends/friendsdk/runtime';
 import { createFriendReader, createGenesisReader } from '@rarefriends/friendsdk/sprites';
-import { createGame, step, WIDTH, HEIGHT, TIERS, type State } from './engine.js';
-import { TIER_INFO, drawJar, type Sprite } from './art.js';
+import { createGame, step, WIDTH, HEIGHT, TIERS, RADII, type State } from './engine.js';
+import { TIER_INFO, drawJar, drawOrb, type Sprite } from './art.js';
 import './style.css';
 
 type Lang = 'ja' | 'en';
@@ -21,6 +21,19 @@ function FriendPixels({ rows, fill, label, size, className }: { rows: Sprite; fi
   return <svg className={className} width={size} height={size} viewBox="0 0 16 16" role="img" aria-label={label}>
     {rows.flatMap((row, y) => [...row].map((p, x) => p === '#' ? <rect key={`${x}-${y}`} x={x} y={y} width="1" height="1" fill={fill} /> : null))}
   </svg>;
+}
+
+/** NEXT preview drawn with the same orb art as the jar, keeping sizes relative to the largest droppable tier. */
+const NEXT_BOX = 64, NEXT_SCALE = (NEXT_BOX / 2 - 3) / RADII[4];
+function NextOrb({ tier, label }: { tier: number; label: string }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const c = ref.current?.getContext('2d');
+    if (!c) return;
+    c.clearRect(0, 0, NEXT_BOX, NEXT_BOX);
+    drawOrb(c, tier, NEXT_BOX / 2, NEXT_BOX / 2, null, NEXT_SCALE);
+  }, [tier]);
+  return <canvas ref={ref} className="next-orb" width={NEXT_BOX} height={NEXT_BOX} data-testid="next-tier" data-tier={tier} role="img" aria-label={label} />;
 }
 
 const newSeed = () => (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
@@ -182,7 +195,7 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
         <div className="hud">
           <div><small>SCORE</small><strong data-testid="score">{String(view.score).padStart(5, '0')}</strong></div>
           <div><small>{t('最高', 'TOP ORB')}</small><strong data-testid="top-tier">{view.maxTier ? `${view.maxTier}/11` : '—'}</strong></div>
-          <div className="next"><small>NEXT</small><span className={`chip t${view.next}`} data-testid="next-tier" aria-label={tierName(view.next)} /></div>
+          <div className="next"><small>NEXT</small><NextOrb tier={view.next} label={tierName(view.next)} /></div>
         </div>
         <div className={`screen${view.danger > 0 ? ' warn' : ''}`}>
           <canvas ref={canvas} width={WIDTH} height={HEIGHT} tabIndex={0} {...pointer}
