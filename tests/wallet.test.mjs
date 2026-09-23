@@ -306,3 +306,42 @@ test('network-switch completion cannot revive disconnected, disposed or changed 
     session.dispose();
   }
 });
+test("a wallet that never answers leaves a retryable state instead of an endless connecting screen", async () => {
+  const w = wallet();
+  const silent = deferred();
+  w.state.overrides.eth_accounts = () => silent.promise;
+  const target = new EventTarget(); target.ethereum = w.provider;
+  const session = createFriendWalletSession({ target, requestTimeoutMs: 20 });
+  assert.equal(session.getSnapshot().status, "connecting");
+  await new Promise(resolve => setTimeout(resolve, 60));
+  assert.equal(session.getSnapshot().status, "disconnected", "silent restore gives up so Connect is offered");
+  assert.equal(session.getSnapshot().error, null);
+  // An explicit prompt that stays unanswered becomes an error the player can retry.
+  const prompt = deferred();
+  w.state.overrides.eth_requestAccounts = () => prompt.promise;
+  const pending = session.connect();
+  assert.equal(session.getSnapshot().status, "connecting");
+  await pending;
+  assert.equal(session.getSnapshot().status, "error");
+  assert.match(session.getSnapshot().error, /did not respond/);
+  // Retrying succeeds once the wallet answers; late answers from the abandoned request are ignored.
+  delete w.state.overrides.eth_requestAccounts;
+  await session.connect();
+  assert.equal(session.getSnapshot().status, "connected");
+  assert.equal(session.getSnapshot().account, OWNER);
+  silent.resolve([NEXT_OWNER]); prompt.resolve([NEXT_OWNER]); await tick();
+  assert.equal(session.getSnapshot().account, OWNER);
+  session.dispose();
+});
+
+test("an already-pending wallet request explains where to finish it", async () => {
+  const w = wallet();
+  w.state.overrides.eth_requestAccounts = () => Promise.reject(Object.assign(new Error("Request of type 'wallet_requestPermissions' already pending"), { code: -32002 }));
+  const target = new EventTarget(); target.ethereum = w.provider;
+  const session = createFriendWalletSession({ target });
+  await session.connect();
+  assert.equal(session.getSnapshot().status, "error");
+  assert.match(session.getSnapshot().error, /already pending/);
+  assert.match(session.getSnapshot().error, /Open your wallet/);
+  session.dispose();
+});

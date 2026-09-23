@@ -95,7 +95,8 @@ function WalletViewport({ session, publicClient, ...props }: Omit<GameHostProps,
   const connection = <div className="rf-runtime-connection">
     {wallet.status === "unavailable" && <><p>No browser wallet found. Enable your wallet extension or open this game in your wallet’s browser.</p><button type="button" onClick={() => { void session.connect(); }}>Check for wallet</button></>}
     {wallet.status === "disconnected" && <p>Connect your wallet to find your Friends on Robinhood.</p>}
-    {wallet.status === "connecting" && <p role="status">Connecting wallet…</p>}
+    {wallet.status === "connecting" && <><p role="status">Connecting wallet… Check your wallet window and unlock it if needed.</p>
+      <button type="button" onClick={() => { void session.connect(); }}>Try connecting again</button></>}
     {wallet.status === "switching-network" && <button type="button" disabled>Switching network… Check your wallet</button>}
     {wallet.status === "wrong-network" && <p role="alert">Your wallet is on {wallet.chainId === 1 ? "Ethereum mainnet" : `chain ${wallet.chainId}`}. Switch to Robinhood mainnet (4663) to load your Friends.</p>}
     {wallet.error && <p role="alert">{wallet.error}</p>}

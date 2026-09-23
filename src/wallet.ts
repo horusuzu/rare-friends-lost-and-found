@@ -23,7 +23,18 @@ export type FriendWalletSessionOptions = Readonly<{
   provider?: FriendWalletProvider;
   /** Defaults to this window. Used by non-browser mounts and tests; never use a parent window. */
   target?: EventTarget & { ethereum?: unknown };
+  /** Test override for how long a wallet may stay silent. Defaults: 8 s for silent reads, 45 s for a connection prompt. */
+  requestTimeoutMs?: number;
 }>;
+const SILENT_READ_TIMEOUT_MS = 8_000;
+const PROMPT_TIMEOUT_MS = 45_000;
+class WalletTimeoutError extends Error {}
+/** Some wallets never settle a request while locked or when their window is hidden. Never wait forever. */
+function withTimeout<T>(request: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new WalletTimeoutError()), ms); });
+  return Promise.race([request, timeout]).finally(() => clearTimeout(timer));
+}
 
 /** SDK defaults are public read-only infrastructure; no account, signer or API key is needed. */
 export function createFriendPublicClient(options: { rpcUrl?: string; batch?: boolean } = {}): PublicClient {
@@ -51,7 +62,9 @@ function readChainId(value: unknown): number {
   return chainId;
 }
 function connectionError(error: unknown): string {
+  if (error instanceof WalletTimeoutError) return "Your wallet did not respond. Unlock it or open its window, then connect again.";
   if (error && typeof error === "object" && "code" in error && error.code === 4001) return "Wallet connection was declined. Try again when ready.";
+  if (error && typeof error === "object" && "code" in error && error.code === -32002) return "A wallet connection request is already pending. Open your wallet to finish it, then try again.";
   return error instanceof Error ? error.message : "Could not read the wallet connection. Try again.";
 }
 
@@ -90,16 +103,21 @@ export function createFriendWalletSession(options: FriendWalletSessionOptions = 
     }
     const { provider } = selected;
     const ticket = invalidate("connecting");
+    const silentMs = options.requestTimeoutMs ?? SILENT_READ_TIMEOUT_MS;
     try {
-      const accounts = await provider.request({ method: prompt ? "eth_requestAccounts" : "eth_accounts" });
+      const accounts = await withTimeout(provider.request({ method: prompt ? "eth_requestAccounts" : "eth_accounts" }),
+        prompt ? options.requestTimeoutMs ?? PROMPT_TIMEOUT_MS : silentMs);
       if (disposed || ticket !== operation) return state;
       const account = readAccount(accounts);
-      const chainId = readChainId(await provider.request({ method: "eth_chainId" }));
+      const chainId = readChainId(await withTimeout(provider.request({ method: "eth_chainId" }), silentMs));
       if (disposed || ticket !== operation) return state;
       publish({ account, chainId, status: account === null ? "disconnected"
         : chainId === GENERATION_SPRITE_MANIFEST.chainId ? "connected" : "wrong-network" });
     } catch (error) {
-      if (!disposed && ticket === operation) publish({ status: "error", account: null, chainId: null, error: connectionError(error) });
+      if (disposed || ticket !== operation) return state;
+      // A silent restore that times out is not a failure the player caused: just offer Connect.
+      if (!prompt && error instanceof WalletTimeoutError) publish({ status: "disconnected", account: null, chainId: null, error: null });
+      else publish({ status: "error", account: null, chainId: null, error: connectionError(error) });
     }
     return state;
   }
