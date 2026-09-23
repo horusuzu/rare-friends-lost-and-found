@@ -3,7 +3,7 @@ export type ScoreShare = readonly [score:number,wave:number,status:'over'|'won',
 export function scoreIntent(result:ScoreShare,friendId:bigint,collection:string){
  const [score,wave,status,lang]=result;const pilot=`${collection==='genesis'?'Genesis':'Friend'} #${friendId}`;
  const text=lang==='ja'?`RARE INVADERSで${pilot}と${score}点！ ${status==='won'?'全5ウェーブクリア！':`WAVE ${wave}/5`}\nあなたのFriendで挑戦してみて。`:`I scored ${score} with ${pilot} in RARE INVADERS! ${status==='won'?'All 5 waves cleared!':`Wave ${wave}/5`}\nYour Friend. Your turn.`;
- const url=new URL('https://x.com/intent/post');url.searchParams.set('text',text);url.searchParams.set('url','https://horusuzu.github.io/rare-friends-lost-and-found/invaders/');url.searchParams.set('hashtags','RareFriends,Vibeathon');return {text,url:url.href};
+ const url=new URL('https://x.com/intent/tweet');url.searchParams.set('text',text);url.searchParams.set('url','https://horusuzu.github.io/rare-friends-lost-and-found/invaders/');url.searchParams.set('hashtags','RareFriends,Vibeathon');return {text,url:url.href};
 }
 export function ScoreShareDialog({result,friendId,collection,onClose}:{result:ScoreShare;friendId:bigint;collection:string;onClose:()=>void}){
  const dialog=useRef<HTMLDialogElement>(null);const ja=result[3]==='ja';const intent=scoreIntent(result,friendId,collection);

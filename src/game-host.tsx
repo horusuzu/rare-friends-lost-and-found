@@ -254,6 +254,7 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, r
     setSessionError("");
     setConfirmation(null);
     function disconnect() {
+      sharing.current=false;setScoreShare(null);
       epoch.current++;
       bridge.current?.close(); bridge.current = null;
       pending.current?.();

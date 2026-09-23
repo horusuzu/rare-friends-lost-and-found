@@ -47,3 +47,35 @@ star field and interface are drawn in this component. SDK assets retain their
 LICENSE, NOTICE.md and asset provenance. This is a standalone developer-hosted
 preview, not an official Rare Friends production release. Existing island gameplay
 and its submission are independent of this shooter.
+
+## Mobile layout and X score sharing
+
+Portrait, compact landscape and the 960 × 640 reference size keep game controls
+separate from the wallet toolbar. Touch controls support held fire and movement;
+safe-area padding and dynamic viewport height accommodate phone browser chrome.
+
+On the result screen choose **Share score on X**. A native dialog in the trusted
+host previews the score, selected NFT and game URL; a user-clicked link opens X.
+Review and publish on X yourself. No automatic post, wallet address or transaction
+is involved. Scores are local/self-reported, with no anti-cheat or online ranking.
+
+This fork adds a bounded `shareScore(score, wave, status, language)` bridge method.
+Only the Rare Invaders preview host enables it. The host sets the NFT identity and
+fixed public game URL; the sandbox cannot supply destinations. The original
+`allow-scripts` iframe restriction remains in force. The dialog pauses the game,
+and a bridge reset clears the dialog. These are fork extensions, not upstream
+SDK v0.1.2 capabilities.
+
+Additional checks:
+
+```sh
+node --test tests/frame-bridge.test.mjs tests/score-share.test.mjs
+node games/rare-invaders/mobile-share.test.mjs
+node games/rare-invaders/genesis-browser.test.mjs
+```
+
+Mobile browser checks emulate 320×568, 390×844, 844×390 and 960×640. They verify
+controls remain on-screen, held fire increases score, a full run ends, the X draft
+matches that score, an intercepted composer opens, and replay works. No test
+publishes to X. Physical iOS/Android hardware testing is not claimed. Use an
+injected-wallet browser (on mobile, typically your wallet's in-app browser).
