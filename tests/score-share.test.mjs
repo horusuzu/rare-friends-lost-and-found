@@ -11,3 +11,13 @@ test('score intent contains the host-selected NFT and fixed game URL',async()=>{
 test('an unconfigured host rejects score sharing',async()=>{
  const definition={name:'Other',consumable:'unused',price:1n,outcomes:[{name:'unused',chanceBps:10000,reward:1n}]};const {port1,port2}=new MessageChannel();const host=bindGameFrame(port1,{client:createGamePreview(definition,{friendId:1n,stake:1n,rfBalance:0n}).client,authorize:async()=>{}});const frame=createFrameGameClient(port2,definition);try{await assert.rejects(frame.client.shareScore(1,1,'over','en'),/unavailable/);}finally{host.close();frame.close();}
 });
+test('Rare Drop shares its own URL, title and largest Friend tier up to eleven',async()=>{
+ const definition={name:'Rare Drop',consumable:'unused',price:1n,outcomes:[{name:'unused',chanceBps:10000,reward:1n}]};const {port1,port2}=new MessageChannel();let received;
+ const host=bindGameFrame(port1,{client:createGamePreview(definition,{friendId:7730n,stake:1n,rfBalance:0n}).client,authorize:async()=>{throw Error('No transactions');},onShareScore:args=>{received=args;}});const frame=createFrameGameClient(port2,definition);
+ try{await frame.client.shareScore(4200,11,'over','en');assert.deepEqual(received,[4200,11,'over','en']);await assert.rejects(frame.client.shareScore(10,12,'over','en'),/Unsupported/);}finally{host.close();frame.close();}
+ const {scoreIntent}=await import('../dist/score-share.js');
+ const ja=scoreIntent([4200,11,'over','ja'],7730n,'generations','Rare Drop');const en=scoreIntent([900,4,'over','en'],597n,'genesis','Rare Drop');
+ for(const {url} of [ja,en])assert.equal(new URL(url).searchParams.get('url'),'https://horusuzu.github.io/rare-friends-lost-and-found/drop/');
+ assert.match(ja.text,/RARE DROP/);assert.match(ja.text,/Friend #7730/);assert.match(ja.text,/4200/);assert.match(ja.text,/Friend/);
+ assert.match(en.text,/Genesis #597/);assert.match(en.text,/tier 4\/11/i);assert.doesNotMatch(en.text,/INVADERS|Wave/);
+});

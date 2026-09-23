@@ -5,6 +5,7 @@ import { createWalletClient, custom, defineChain, formatEther, isAddress, parseA
 import { GENERATION_SPRITE_MANIFEST } from "./generation-sprites.js";
 const WALLET_ABI = parseAbi(["function tokenBoundAccount(uint256 tokenId) view returns (address)"]);
 import {ScoreShareDialog,type ScoreShare} from "./score-share.js";
+import {scoreGame} from "./score-games.js";
 import { readFriendRewards } from './friend-rewards.js';
 import { bindGameFrame, createPreviewLocalStore, type GameArguments, type GameMethod } from "./frame-bridge.js";
 import { GameFrame, type GameConfirmation, type GameFriend, type GameFrameProps } from "./game-frame.js";
@@ -356,7 +357,7 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, r
       }
       clearTimeout(timeout);
       const connection = bindGameFrame(channel.port1, { client: activeClient, authorize,
-        onShareScore: !live && definition.name === "Rare Invaders" ? result => { if (!alive) return; sharing.current=true; connection.setPaused(true); setScoreShare(result); } : undefined,
+        onShareScore: !live && scoreGame(definition.name) ? result => { if (!alive) return; sharing.current=true; connection.setPaused(true); setScoreShare(result); } : undefined,
         onActionChange(value) { actionPending.current = value; if (alive) setTransactionPending(value); },
         onError(error, method) {
           if (alive && method === "read") { setSessionError(error.message); setStatus("error"); }
@@ -412,7 +413,7 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, r
     </div> : rewards ? <div className="rf-runtime-connection"><p>実際の報酬の受取・アクティベートは公式サイトで行えます。このゲームから取引は送りません。</p><a href="https://rarefriends.com/portfolio" target="_blank" rel="noopener noreferrer">公式で確認・受取 ↗</a><p className="rf-frame-note">このパネルの demo RF はゲーム内の模擬残高です。実残高はおうちの貯金箱で確認してください。</p></div> : undefined}
     confirmation={confirmation} onMenuChange={onMenuChange} {...picker}>
     <iframe key={attempt} ref={iframe} src={frameUrl} title={definition.name} sandbox="allow-scripts" referrerPolicy="no-referrer" />
-    {scoreShare && <ScoreShareDialog result={scoreShare} friendId={friend.id} collection={friend.collection ?? "generations"} onClose={()=>{sharing.current=false;setScoreShare(null);bridge.current?.setPaused(paused.current || fundingRef.current);}}/>}
+    {scoreShare && <ScoreShareDialog result={scoreShare} friendId={friend.id} collection={friend.collection ?? "generations"} gameName={definition.name} onClose={()=>{sharing.current=false;setScoreShare(null);bridge.current?.setPaused(paused.current || fundingRef.current);}}/>}
     {status !== "ready" && <div className="rf-runtime-status" role={status === "error" ? "alert" : "status"}>
       <p>{status === "loading" ? live ? "Loading live game…" : "Loading game preview…" : sessionError || "The game could not connect. Check the frame URL and its asset permissions."}</p>
       {status === "error" && <button type="button" onClick={() => setAttempt(value => value + 1)}>Retry game</button>}

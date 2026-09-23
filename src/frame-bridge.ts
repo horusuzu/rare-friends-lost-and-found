@@ -1,14 +1,15 @@
 import type { ChanceGameDefinition, GameSnapshot, GameClient } from './game.js';
+import { scoreGame } from './score-games.js';
 
 export type GameMethod = 'read' | 'canBuy' | 'buy' | 'play' | 'settle' | 'redeem' | 'loadLocal' | 'saveLocal' | 'readRewards' | 'shareScore';
 export type GameArguments = readonly (bigint | number | string)[];
 const UINT256_MAX = (1n << 256n) - 1n;
 const quantity = (value: unknown) => typeof value === 'bigint' && value > 0n && value <= 99n;
-function valid(method: unknown, args: unknown, outcomes: number): args is (bigint | number | string)[] {
+function valid(method: unknown, args: unknown, outcomes: number, maxWave = 5): args is (bigint | number | string)[] {
   if (!Array.isArray(args)) return false;
   switch (method) {
     case 'read': case 'loadLocal': case 'readRewards': return args.length === 0;
-    case 'shareScore': return args.length === 4 && Number.isSafeInteger(args[0]) && args[0] >= 0 && args[0] < 1e9 && Number.isInteger(args[1]) && args[1] >= 1 && args[1] <= 5 && ['over','won'].includes(args[2]) && ['ja','en'].includes(args[3]);
+    case 'shareScore': return args.length === 4 && Number.isSafeInteger(args[0]) && args[0] >= 0 && args[0] < 1e9 && Number.isInteger(args[1]) && args[1] >= 1 && args[1] <= maxWave && ['over','won'].includes(args[2]) && ['ja','en'].includes(args[3]);
     case 'saveLocal': return args.length === 1 && validLocalValue(args[0]);
     case 'canBuy': case 'buy': case 'play': return args.length === 1 && quantity(args[0]);
     case 'settle': return args.length === 1 && typeof args[0] === 'bigint' && args[0] > 0n && args[0] <= UINT256_MAX;
@@ -67,7 +68,7 @@ export function bindGameFrame(port: MessagePort, options: {
     const request = data as { type?: unknown; id?: unknown; method?: unknown; args?: unknown };
     if (request.type !== 'friendsdk:request' || !Number.isSafeInteger(request.id) || Number(request.id) <= lastId) return;
     const id = Number(request.id); lastId = id;
-    if (!valid(request.method, request.args, options.client.definition.outcomes.length)) {
+    if (!valid(request.method, request.args, options.client.definition.outcomes.length, scoreGame(options.client.definition.name)?.maxWave)) {
       send({ type: 'friendsdk:response', id, error: 'Unsupported game action.' }); return;
     }
     if (request.method === 'shareScore') {
