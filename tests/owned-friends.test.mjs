@@ -111,3 +111,11 @@ test('cancellation while discovery is pending never returns an old account resul
   await assert.rejects(readOwnedFriends(f.client, OWNER, { signal: abort.signal }), { name: 'AbortError' });
   assert.equal(f.calls.filter(call => call.functionName === 'ownerOf').length, 0);
 });
+
+test('discovery deadline rejects a stalled read with a timeout error and passes fast results through', async () => {
+  const { withDiscoveryDeadline, FriendDiscoveryTimeoutError } = await import('../dist/owned-friends.js');
+  assert.equal(await withDiscoveryDeadline(Promise.resolve('ok'), 1_000), 'ok');
+  await assert.rejects(withDiscoveryDeadline(Promise.reject(new Error('rpc down')), 1_000), /rpc down/);
+  const stalled = new Promise(() => {});
+  await assert.rejects(withDiscoveryDeadline(stalled, 20), error => error instanceof FriendDiscoveryTimeoutError);
+});
