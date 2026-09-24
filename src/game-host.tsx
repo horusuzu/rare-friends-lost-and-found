@@ -86,7 +86,7 @@ function WalletViewport({ session, publicClient, ...props }: Omit<GameHostProps,
       const friends: GameFriend[] = [];
       if (genesis.status === "fulfilled" && genesis.value?.eligible) friends.push({ id: props.linkedGenesisId!, collection: "genesis", label: `Genesis #${props.linkedGenesisId}`, kind: "owned", walletAddress: genesis.value.walletAddress });
       if (generations.status === "fulfilled") friends.push(...generations.value.friends);
-      const errors = [generations.status === "rejected" ? "Generationsを読み込めませんでした。再読み込みしてください。" : "", genesis.status === "rejected" ? "Genesisを確認できませんでした。再読み込みしてください。" : ""].filter(Boolean);
+      const errors = [generations.status === "rejected" ? "Could not load your Friends. Try again." : "", genesis.status === "rejected" ? "Could not verify the linked Genesis. Try again." : ""].filter(Boolean);
       setDiscovery({ client: publicClient, session, revision: wallet.revision, attempt, friends,
         hiddenCount: generations.status === "fulfilled" ? generations.value.hiddenCount : 0, error: errors.join(" ") || undefined });
     });
