@@ -87,3 +87,30 @@ test('RF packs: the SDK outcome decides the finish; RF spent is counted and save
   assert.equal(parseAlbum(JSON.stringify(old)).rfPacks, 0, 'older saves without the counter still load');
   assert.throws(() => parseAlbum(JSON.stringify({...old, rfPacks:-1})));
 });
+
+test('battle record: wins/losses/draws, burned tickets, pending challenges and one answer per challenge', async () => {
+  const {recordBattle, recordBurn, addChallenge, takeChallenge, markFought, hasFought} = await import('./album.ts');
+  let a = newAlbum('2026-09-25');
+  assert.deepEqual(a.record, {wins:0, losses:0, draws:0}); assert.equal(a.rfBurned, 0); assert.deepEqual(a.challenges, []); assert.deepEqual(a.fought, []);
+  a = recordBattle(recordBattle(recordBattle(a, 'win'), 'loss'), 'draw');
+  assert.deepEqual(a.record, {wins:1, losses:1, draws:1});
+  a = recordBurn(recordBurn(a)); assert.equal(a.rfBurned, 2);
+  const deck5 = [0, 1, 2, 3, 4].map(i => openPack(me, i));
+  a = addChallenge(a, 99, deck5);
+  assert.deepEqual(a.challenges, [{nonce:99, deck:deck5}]);
+  const [taken, rest] = takeChallenge(a, 99); assert.deepEqual(taken.deck, deck5); assert.deepEqual(rest.challenges, []);
+  assert.equal(takeChallenge(a, 12345)[0], null);
+  for (let i = 0; i < 12; i++) a = addChallenge(a, 1000 + i, deck5);
+  assert.ok(a.challenges.length <= 10, 'only the latest challenges are kept');
+  const key = 'genesis:597:42';
+  assert.equal(hasFought(a, key), false); a = markFought(a, key); assert.equal(hasFought(a, key), true);
+  for (let i = 0; i < 80; i++) a = markFought(a, `x:${i}`); assert.ok(a.fought.length <= 60);
+  const round = parseAlbum(serializeAlbum(a)); assert.deepEqual(round, a);
+  const old = JSON.parse(serializeAlbum(newAlbum('2026-09-25'))); for (const k of ['record', 'rfBurned', 'challenges', 'fought']) delete old[k];
+  const loaded = parseAlbum(JSON.stringify(old)); assert.deepEqual(loaded.record, {wins:0, losses:0, draws:0}); assert.deepEqual(loaded.challenges, []);
+  assert.throws(() => parseAlbum(JSON.stringify({...old, record:{wins:-1, losses:0, draws:0}})));
+  let full = newAlbum('2026-09-25'); for (let i = 0; i < 10; i++) full = addChallenge(full, i, deck5);
+  for (let i = 0; i < 60; i++) full = markFought(full, `genesis:${i}:${i * 99991}`);
+  for (let i = 0; i < 150; i++) full = addSticker(full, openPack(i % 2 ? me : genesis, i), 'pack', i);
+  assert.ok(new TextEncoder().encode(serializeAlbum(full)).byteLength < 32 * 1024);
+});

@@ -9,7 +9,18 @@ export interface Sticker extends Owner { style: number; backdrop: number; hue: n
 export type Source = 'pack' | 'trade';
 export interface Placed { sticker: Sticker; source: Source; page: number; x: number; y: number; rot: number }
 /** rfPacks: RF packs opened so far (RF spent = rfPacks × pack price). */
-export interface Album { version: 1; packs: number; day: string; rfPacks: number; items: Placed[] }
+export interface BattleRecord { wins: number; losses: number; draws: number }
+export interface Challenge { nonce: number; deck: Sticker[] }
+/**
+ * rfPacks / rfBurned: RF tickets spent on packs / burned as battle entry fees.
+ * challenges: my open challenges (their decks are needed to replay the reply).
+ * fought: challenge keys already answered or settled, so a challenge counts only once.
+ */
+export interface Album {
+  version: 1; packs: number; day: string; rfPacks: number; rfBurned: number;
+  record: BattleRecord; challenges: Challenge[]; fought: string[]; items: Placed[];
+}
+const MAX_CHALLENGES = 10, MAX_FOUGHT = 60;
 
 export interface Style { id: string; ja: string; en: string; rarity: 1 | 2 | 3 | 4; weight: number }
 export const STYLES: readonly Style[] = [
@@ -155,7 +166,25 @@ export function decodeCode(input: string): Sticker {
 }
 
 // ---- Album ----
-export function newAlbum(day: string): Album { return { version: 1, packs: PACKS_PER_DAY, day, rfPacks: 0, items: [] }; }
+export function newAlbum(day: string): Album {
+  return { version: 1, packs: PACKS_PER_DAY, day, rfPacks: 0, rfBurned: 0, record: { wins: 0, losses: 0, draws: 0 }, challenges: [], fought: [], items: [] };
+}
+export function recordBattle(album: Album, result: 'win' | 'loss' | 'draw'): Album {
+  const key = result === 'win' ? 'wins' : result === 'loss' ? 'losses' : 'draws';
+  return { ...album, record: { ...album.record, [key]: album.record[key] + 1 } };
+}
+export function recordBurn(album: Album): Album { return { ...album, rfBurned: album.rfBurned + 1 }; }
+export function addChallenge(album: Album, nonce: number, deck: Sticker[]): Album {
+  return { ...album, challenges: [...album.challenges.filter(c => c.nonce !== nonce), { nonce, deck }].slice(-MAX_CHALLENGES) };
+}
+export function takeChallenge(album: Album, nonce: number): [Challenge | null, Album] {
+  const found = album.challenges.find(c => c.nonce === nonce) ?? null;
+  return [found, found ? { ...album, challenges: album.challenges.filter(c => c !== found) } : album];
+}
+export const hasFought = (album: Album, key: string) => album.fought.includes(key);
+export function markFought(album: Album, key: string): Album {
+  return { ...album, fought: [...album.fought.filter(k => k !== key), key].slice(-MAX_FOUGHT) };
+}
 
 export function refillPacks(album: Album, day: string): Album {
   if (day <= album.day) return album;
@@ -192,12 +221,14 @@ export function moveSticker(album: Album, index: number, x: number, y: number): 
 type StoredItem = [code: string, source: 'p' | 't', page: number, x: number, y: number, rot: number];
 export function serializeAlbum(album: Album): string {
   const items: StoredItem[] = album.items.map(it => [encodeCode(it.sticker), it.source === 'pack' ? 'p' : 't', it.page, Math.round(it.x * 1000), Math.round(it.y * 1000), Math.round(it.rot * 1000)]);
-  return JSON.stringify({ version: 1, packs: album.packs, day: album.day, rfPacks: album.rfPacks, items });
+  const challenges = album.challenges.map(c => [c.nonce, c.deck.map(encodeCode)]);
+  return JSON.stringify({ version: 1, packs: album.packs, day: album.day, rfPacks: album.rfPacks, rfBurned: album.rfBurned,
+    record: [album.record.wins, album.record.losses, album.record.draws], challenges, fought: album.fought, items });
 }
 
 export function parseAlbum(raw: string | null): Album | null {
   if (raw === null) return null;
-  const v = JSON.parse(raw) as { version?: unknown; packs?: unknown; day?: unknown; rfPacks?: unknown; items?: unknown };
+  const v = JSON.parse(raw) as { version?: unknown; packs?: unknown; day?: unknown; rfPacks?: unknown; rfBurned?: unknown; record?: unknown; challenges?: unknown; fought?: unknown; items?: unknown };
   const int = (n: unknown, min: number, max: number) => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
   if (v.version !== 1 || !int(v.packs, 0, MAX_PACKS) || typeof v.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v.day) ||
       !Array.isArray(v.items) || v.items.length > MAX_ITEMS || (v.rfPacks !== undefined && !int(v.rfPacks, 0, 1_000_000))) throw new Error('Invalid sticker book.');
@@ -207,5 +238,18 @@ export function parseAlbum(raw: string | null): Album | null {
     if (typeof code !== 'string' || (source !== 'p' && source !== 't') || !int(page, 0, MAX_ITEMS) || !int(x, 0, 1000) || !int(y, 0, 1000) || !int(rot, -250, 250)) throw new Error('Invalid sticker book.');
     return { sticker: decodeCode(code), source: source === 'p' ? 'pack' : 'trade', page, x: x / 1000, y: y / 1000, rot: rot / 1000 };
   });
-  return { version: 1, packs: v.packs as number, day: v.day, rfPacks: (v.rfPacks as number | undefined) ?? 0, items };
+  const count = (n: unknown) => { if (!int(n, 0, 1_000_000)) throw new Error('Invalid sticker book.'); return n as number; };
+  const rec = v.record ?? [0, 0, 0];
+  if (!Array.isArray(rec) || rec.length !== 3) throw new Error('Invalid sticker book.');
+  const rawChallenges = v.challenges ?? [], rawFought = v.fought ?? [];
+  if (!Array.isArray(rawChallenges) || rawChallenges.length > MAX_CHALLENGES || !Array.isArray(rawFought) || rawFought.length > MAX_FOUGHT ||
+      !rawFought.every(k => typeof k === 'string' && k.length <= 80)) throw new Error('Invalid sticker book.');
+  const challenges = rawChallenges.map((c: unknown): Challenge => {
+    if (!Array.isArray(c) || c.length !== 2 || !int(c[0], 0, 0xffffffff) || !Array.isArray(c[1]) || c[1].length !== 5) throw new Error('Invalid sticker book.');
+    return { nonce: c[0], deck: c[1].map((code: unknown) => { if (typeof code !== 'string') throw new Error('Invalid sticker book.'); return decodeCode(code); }) };
+  });
+  return {
+    version: 1, packs: v.packs as number, day: v.day, rfPacks: v.rfPacks === undefined ? 0 : count(v.rfPacks), rfBurned: v.rfBurned === undefined ? 0 : count(v.rfBurned),
+    record: { wins: count(rec[0]), losses: count(rec[1]), draws: count(rec[2]) }, challenges, fought: rawFought as string[], items,
+  };
 }
