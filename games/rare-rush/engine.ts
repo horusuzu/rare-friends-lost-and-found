@@ -6,11 +6,15 @@ export const CHECKPOINT_BONUS = 15;
 export const MIN_SPEED = 6;
 export const MAX_SPEED = 100;
 export const FUJI_HEIGHT = 79;
+/** Turbo lifts the cap to 432 km/h for a short burst. */
+export const TURBO_MAX_SPEED = 120;
+export const MAX_TURBOS = 3;
+const TURBO_KICK = 20, TURBO_PUSH = 32, TURBO_TIME = 1.6, SETTLE = 30;
 const GRAVITY = 24, DIVE = 1.9, AIR_DIVE = 2.8, DRAG = 0.00055, SCREAM_PUSH = 5;
 const PERFECT_ANGLE = 0.35, BAD_ANGLE = 0.95, CATCH_RADIUS = 3.6, GATE_BOOST = 14;
 const SCREAM_TIME = 6, PRESSURE_RISE = 1.2, STEP = 1 / 120, MIN_FLIGHT = 0.25;
 
-export type EventKind = 'launch' | 'perfect-launch' | 'perfect' | 'bad' | 'boost' | 'checkpoint' | 'scream';
+export type EventKind = 'launch' | 'perfect-launch' | 'perfect' | 'bad' | 'boost' | 'checkpoint' | 'scream' | 'item' | 'turbo';
 export interface RushEvent { kind: EventKind; at: number }
 export interface State {
   status: 'launch' | 'running' | 'over';
@@ -21,11 +25,14 @@ export interface State {
   /** airTime when the current flight began; landings shorter than MIN_FLIGHT are not graded. */
   takeoffAt: number;
   scream: number; screamTime: number; nextCheckpoint: number; collected: number[];
+  /** turboTail: seconds after a turbo during which speed eases back under the normal cap. */
+  turbos: number; turboTime: number; turboTail: number; turboHeld: boolean;
   event: RushEvent | null;
 }
-export interface Input { hold: boolean }
+/** `turbo` fires once per press; holding the key does not refire. */
+export interface Input { hold: boolean; turbo?: boolean }
 export interface TrackPoint { x: number; y: number }
-export interface Ring { id: number; kind: 'spark' | 'gate'; x: number; y: number }
+export interface Ring { id: number; kind: 'spark' | 'gate' | 'turbo'; x: number; y: number }
 
 export const kmh = (metresPerSecond: number) => Math.round(metresPerSecond * 3.6);
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
@@ -92,6 +99,8 @@ export function ringsBetween(x0: number, x1: number, seed: number): Ring[] {
       const rx = x + (i - 2) * 7;
       rings.push({ id: k * 10 + i, kind: 'spark', x: rx, y: trackHeight(rx, seed) + 5 + (2 - Math.abs(i - 2)) * 1.6 });
     } else if (k % 6 === 0) rings.push({ id: k * 10 + 9, kind: 'gate', x, y: trackHeight(x, seed) + 1.2 });
+    // A turbo capsule floats down the far side of every fourth crest.
+    if (k % 8 === 3) { const tx = x + 18; rings.push({ id: k * 10 + 7, kind: 'turbo', x: tx, y: trackHeight(tx, seed) + 2.2 }); }
   }
   return rings.filter(r => r.x >= x0 && r.x <= x1);
 }
@@ -102,11 +111,17 @@ export function createGame(seed = 1): State {
     x: 12, y: 0, vx: 0, vy: 0, speed: 0, grounded: true, held: false, heldFor: 0, pressure: 0,
     distance: 0, score: 0, sparks: 0, perfects: 0, maxSpeed: 0, airTime: 0, takeoffAt: 0,
     scream: 0, screamTime: 0, nextCheckpoint: CHECKPOINT_EVERY, collected: [], event: null,
+    turbos: 1, turboTime: 0, turboTail: 0, turboHeld: false,
   };
 }
 
 const emit = (s: State, kind: EventKind) => { s.event = { kind, at: s.time }; };
 const multiplier = (s: State) => s.screamTime > 0 ? 2 : 1;
+/** Top speed: raised during turbo, then eased back down instead of snapping. */
+function capped(s: State, speed: number, h: number, previous: number): number {
+  const top = s.turboTime > 0 ? TURBO_MAX_SPEED : s.turboTail > 0 ? Math.max(MAX_SPEED, Math.min(TURBO_MAX_SPEED, previous) - SETTLE * h) : MAX_SPEED;
+  return clamp(speed, MIN_SPEED, top);
+}
 
 function launchPhase(s: State, hold: boolean, dt: number): void {
   if (hold) {
@@ -127,7 +142,8 @@ function ride(s: State, hold: boolean, h: number): void {
   const weight = hold ? DIVE : 1;
   let accel = -GRAVITY * Math.sin(angle) * weight - DRAG * s.speed * s.speed;
   if (s.screamTime > 0) accel += SCREAM_PUSH;
-  s.speed = clamp(s.speed + accel * h, MIN_SPEED, MAX_SPEED);
+  if (s.turboTime > 0) accel = Math.max(accel, 0) + TURBO_PUSH;
+  s.speed = capped(s, s.speed + accel * h, h, s.speed);
   const curve = trackCurve(s.x, s.seed) / Math.pow(1 + slope * slope, 1.5);
   if (curve < 0 && s.speed * s.speed * -curve > GRAVITY * weight * Math.cos(angle)) {
     s.grounded = false; s.takeoffAt = s.airTime; s.vx = s.speed * Math.cos(angle); s.vy = s.speed * Math.sin(angle);
@@ -138,9 +154,11 @@ function ride(s: State, hold: boolean, h: number): void {
 }
 
 function fly(s: State, hold: boolean, h: number): void {
+  const before = Math.hypot(s.vx, s.vy);
   s.vy -= GRAVITY * (hold ? AIR_DIVE : 1) * h;
-  const airSpeed = Math.hypot(s.vx, s.vy);
-  if (airSpeed > MAX_SPEED) { s.vx *= MAX_SPEED / airSpeed; s.vy *= MAX_SPEED / airSpeed; }
+  if (s.turboTime > 0) s.vx += TURBO_PUSH * h;
+  const airSpeed = Math.hypot(s.vx, s.vy), top = capped(s, airSpeed, h, before);
+  if (airSpeed > top) { s.vx *= top / airSpeed; s.vy *= top / airSpeed; }
   s.x += Math.max(s.vx, MIN_SPEED) * h; s.y += s.vy * h;
   s.airTime += h;
   if (s.vy < -18) s.scream += 0.3 * h;
@@ -150,13 +168,13 @@ function fly(s: State, hold: boolean, h: number): void {
   const miss = Math.abs(heading - tangent), along = Math.hypot(s.vx, s.vy) * Math.cos(miss);
   s.y = ground; s.grounded = true;
   // Skimming a crest for a few substeps is riding, not a jump: no grade either way.
-  if (s.airTime - s.takeoffAt < MIN_FLIGHT) s.speed = clamp(along, MIN_SPEED, MAX_SPEED);
+  if (s.airTime - s.takeoffAt < MIN_FLIGHT) s.speed = capped(s, along, 0, along);
   else if (miss < PERFECT_ANGLE) {
-    s.speed = clamp(along * 1.12, MIN_SPEED, MAX_SPEED); s.perfects += 1; s.scream += 0.22;
+    s.speed = capped(s, along * 1.12, 0, along); s.perfects += 1; s.scream += 0.22;
     s.score += 100 * multiplier(s); emit(s, 'perfect');
   } else if (miss > BAD_ANGLE) {
-    s.speed = clamp(along * 0.75, MIN_SPEED, MAX_SPEED); emit(s, 'bad');
-  } else s.speed = clamp(along, MIN_SPEED, MAX_SPEED);
+    s.speed = capped(s, along * 0.75, 0, along); emit(s, 'bad');
+  } else s.speed = capped(s, along, 0, along);
 }
 
 function collect(s: State): void {
@@ -165,11 +183,13 @@ function collect(s: State): void {
     if (collected.has(ring.id) || Math.hypot(ring.x - s.x, ring.y - s.y) > CATCH_RADIUS) continue;
     collected.add(ring.id);
     if (ring.kind === 'spark') { s.sparks += 1; s.score += 10 * multiplier(s); continue; }
-    s.speed = clamp(s.speed + GATE_BOOST, MIN_SPEED, MAX_SPEED);
+    if (ring.kind === 'turbo') { s.turbos = Math.min(MAX_TURBOS, s.turbos + 1); emit(s, 'item'); continue; }
+    s.speed = capped(s, s.speed + GATE_BOOST, 0, s.speed);
     if (!s.grounded) {
+      const before = Math.hypot(s.vx, s.vy);
       s.vx += GATE_BOOST;
-      const air = Math.hypot(s.vx, s.vy);
-      if (air > MAX_SPEED) { s.vx *= MAX_SPEED / air; s.vy *= MAX_SPEED / air; }
+      const air = Math.hypot(s.vx, s.vy), top = capped(s, air, 0, before);
+      if (air > top) { s.vx *= top / air; s.vy *= top / air; }
     }
     s.score += 50 * multiplier(s); emit(s, 'boost');
   }
@@ -177,7 +197,15 @@ function collect(s: State): void {
   s.collected = [...collected].slice(-40);
 }
 
-function running(s: State, hold: boolean, dt: number): void {
+function fireTurbo(s: State): void {
+  s.turbos -= 1; s.turboTime = TURBO_TIME; s.scream += 0.15;
+  if (s.grounded) s.speed = Math.min(TURBO_MAX_SPEED, s.speed + TURBO_KICK);
+  else s.vx += TURBO_KICK;
+  emit(s, 'turbo');
+}
+
+function running(s: State, hold: boolean, turbo: boolean, dt: number): void {
+  if (turbo && !s.turboHeld && s.turbos > 0) fireTurbo(s);
   for (let left = dt; left > 1e-9; left -= STEP) {
     const h = Math.min(STEP, left), before = s.x;
     if (s.grounded) ride(s, hold, h); else fly(s, hold, h);
@@ -189,6 +217,8 @@ function running(s: State, hold: boolean, dt: number): void {
   s.maxSpeed = Math.max(s.maxSpeed, speed);
   if (speed > 45) s.scream += dt * (speed - 45) / 60; else if (s.screamTime === 0) s.scream = Math.max(0, s.scream - 0.04 * dt);
   if (s.screamTime > 0) s.screamTime = Math.max(0, s.screamTime - dt);
+  if (s.turboTime > 0 && s.turboTime <= dt) s.turboTail = 1.2; else s.turboTail = Math.max(0, s.turboTail - dt);
+  s.turboTime = Math.max(0, s.turboTime - dt);
   if (s.scream >= 1 && s.screamTime === 0) { s.scream = 0; s.screamTime = SCREAM_TIME; emit(s, 'scream'); }
   s.scream = clamp(s.scream, 0, 1);
   if (s.x >= s.nextCheckpoint) { s.timeLeft += CHECKPOINT_BONUS; s.nextCheckpoint += CHECKPOINT_EVERY; emit(s, 'checkpoint'); }
@@ -202,6 +232,7 @@ export function step(state: State, input: Input, elapsed: number): State {
   const s: State = { ...state, collected: [...state.collected], event: state.event && { ...state.event } };
   s.time += dt;
   if (s.status === 'launch') launchPhase(s, input.hold === true, dt);
-  else running(s, input.hold === true, dt);
+  else running(s, input.hold === true, input.turbo === true, dt);
+  s.turboHeld = input.turbo === true;
   return s;
 }

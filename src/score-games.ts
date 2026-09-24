@@ -4,7 +4,7 @@ export const SCORE_GAMES: Readonly<Record<string, ScoreGame>> = Object.freeze({
   'Rare Invaders': Object.freeze({ title: 'RARE INVADERS', url: 'https://horusuzu.github.io/rare-friends-lost-and-found/invaders/', maxWave: 5, copy: 'waves' }),
   'Rare Drop': Object.freeze({ title: 'RARE DROP', url: 'https://horusuzu.github.io/rare-friends-lost-and-found/drop/', maxWave: 11, copy: 'tiers' }),
   /** Rare Rush sends its top speed in km/h as the second value. */
-  'Rare Rush': Object.freeze({ title: 'RARE RUSH', url: 'https://horusuzu.github.io/rare-friends-lost-and-found/rush/', maxWave: 360, copy: 'speed' }),
+  'Rare Rush': Object.freeze({ title: 'RARE RUSH', url: 'https://horusuzu.github.io/rare-friends-lost-and-found/rush/', maxWave: 450, copy: 'speed' }),
 });
 export function scoreGame(name: string): ScoreGame | undefined {
   return Object.hasOwn(SCORE_GAMES, name) ? SCORE_GAMES[name] : undefined;

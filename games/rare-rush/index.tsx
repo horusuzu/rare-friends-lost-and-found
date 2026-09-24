@@ -14,7 +14,9 @@ const EVENT_TEXT: Record<EventKind, [string, string]> = {
   'perfect': ['ナイス着地！ 加速！', 'PERFECT LANDING!'], 'bad': ['ドスン… 減速', 'ROUGH LANDING'],
   'boost': ['BOOST GATE！', 'BOOST GATE!'], 'checkpoint': ['CHECKPOINT +15秒', 'CHECKPOINT +15s'],
   'scream': ['絶叫モード ×2！！', 'SCREAM MODE ×2!!'],
+  'item': ['ターボ ゲット！', 'TURBO GET!'], 'turbo': ['ターボ！ ギュイーン!!', 'TURBO!!'],
 };
+const TURBO_KEYS = ['shift', 'arrowup', 't'];
 
 function parseSave(raw: string | null): Omit<Saved, 'version'> | null {
   if (!raw) return null;
@@ -44,7 +46,7 @@ function Ride({ friendId, collection = 'generations', client, paused }: GameComp
   const [record, setRecord] = useState(EMPTY), [sound, setSound] = useState(true);
   const [saveError, setSaveError] = useState(false), [shareError, setShareError] = useState(false);
   const canvas = useRef<HTMLCanvasElement>(null), world = useRef<State>(createGame(1)), camera = useRef<Camera>(newCamera(world.current));
-  const trail = useRef<Trail[]>([]), holds = useRef(new Set<string>()), wind = useRef<Wind | null>(null), soundRef = useRef(true);
+  const trail = useRef<Trail[]>([]), holds = useRef(new Set<string>()), turboKeys = useRef(new Set<string>()), wind = useRef<Wind | null>(null), soundRef = useRef(true);
   const saved = useRef(EMPTY), unsaved = useRef(false), alive = useRef(false);
   const t = (ja: string, en: string) => lang === 'ja' ? ja : en;
   const active = started && !paused && !manualPause && ready;
@@ -69,16 +71,17 @@ function Ride({ friendId, collection = 'generations', client, paused }: GameComp
   }, [client, friendId, collection, attempt]);
 
   useEffect(() => {
-    const release = () => holds.current.clear();
+    const release = () => { holds.current.clear(); turboKeys.current.clear(); };
     const blur = () => { release(); setManualPause(true); };
     const visibility = () => { if (document.hidden) blur(); };
     const down = (e: KeyboardEvent) => {
       if ((e.target as HTMLElement)?.closest('button,input')) return;
       const key = e.key.toLowerCase();
       if ([' ', 'arrowdown', 'enter', 's'].includes(key)) { e.preventDefault(); holds.current.add(`key:${key}`); }
+      if (TURBO_KEYS.includes(key)) { e.preventDefault(); turboKeys.current.add(`key:${key}`); }
       if (key === 'escape' || key === 'p') { e.preventDefault(); release(); setManualPause(v => !v); }
     };
-    const up = (e: KeyboardEvent) => holds.current.delete(`key:${e.key.toLowerCase()}`);
+    const up = (e: KeyboardEvent) => { holds.current.delete(`key:${e.key.toLowerCase()}`); turboKeys.current.delete(`key:${e.key.toLowerCase()}`); };
     window.addEventListener('keydown', down); window.addEventListener('keyup', up);
     window.addEventListener('blur', blur); document.addEventListener('visibilitychange', visibility);
     return () => {
@@ -89,7 +92,7 @@ function Ride({ friendId, collection = 'generations', client, paused }: GameComp
   }, []);
 
   // Input pressed while paused never carries into play.
-  useEffect(() => { holds.current.clear(); }, [active]);
+  useEffect(() => { holds.current.clear(); turboKeys.current.clear(); }, [active]);
   useEffect(() => () => { wind.current?.close(); wind.current = null; }, []);
   // Match the canvas to the stage so portrait phones use the full height.
   useEffect(() => {
@@ -107,10 +110,10 @@ function Ride({ friendId, collection = 'generations', client, paused }: GameComp
       const dt = last ? Math.min(0.034, (now - last) / 1000) : 0; last = now;
       const before = world.current;
       if (active && before.status !== 'over') {
-        const next = step(before, { hold: holds.current.size > 0 }, dt);
+        const next = step(before, { hold: holds.current.size > 0, turbo: turboKeys.current.size > 0 }, dt);
         world.current = next;
         if (next.event && next.event !== before.event && next.event.at === next.time) {
-          if (['bad', 'boost', 'perfect-launch'].includes(next.event.kind)) camera.current = { ...camera.current, shake: 1 };
+          if (['bad', 'boost', 'perfect-launch', 'turbo'].includes(next.event.kind)) camera.current = { ...camera.current, shake: 1 };
         }
         trail.current = [...trail.current.slice(-9), { x: next.x, y: next.y }];
         if (next.status === 'over') saveRecord(next);
@@ -152,12 +155,18 @@ function Ride({ friendId, collection = 'generations', client, paused }: GameComp
     if (unsaved.current) persist();
     if (!wind.current) wind.current = createWind();
     world.current = createGame(newSeed()); camera.current = newCamera(world.current); trail.current = [];
-    setView(world.current); holds.current.clear();
+    setView(world.current); holds.current.clear(); turboKeys.current.clear();
     setStarted(true); setManualPause(false); setShareError(false); canvas.current?.focus();
   };
   const resume = () => { setManualPause(false); canvas.current?.focus(); };
   const toggleSound = () => { soundRef.current = !soundRef.current; setSound(soundRef.current); };
 
+  const turboPress = {
+    onPointerDown: (e: React.PointerEvent<HTMLElement>) => { if (!active || world.current.status !== 'running') return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); turboKeys.current.add(`pointer:${e.pointerId}`); },
+    onPointerUp: (e: React.PointerEvent<HTMLElement>) => { turboKeys.current.delete(`pointer:${e.pointerId}`); },
+    onPointerCancel: (e: React.PointerEvent<HTMLElement>) => { turboKeys.current.delete(`pointer:${e.pointerId}`); },
+    onLostPointerCapture: (e: React.PointerEvent<HTMLElement>) => { turboKeys.current.delete(`pointer:${e.pointerId}`); },
+  };
   const press = (id: string) => ({
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => {
       // Overlay buttons (share, ride again) sit inside the stage: never capture their presses.
@@ -173,7 +182,7 @@ function Ride({ friendId, collection = 'generations', client, paused }: GameComp
   const toast = s.event && s.time - s.event.at < 1.4 ? EVENT_TEXT[s.event.kind][lang === 'ja' ? 0 : 1] : null;
   const share = () => {
     setShareError(false);
-    void client.shareScore!(Math.round(s.score), Math.min(360, Math.max(1, kmh(s.maxSpeed))), 'over', lang).catch(() => setShareError(true));
+    void client.shareScore!(Math.round(s.score), Math.min(450, Math.max(1, kmh(s.maxSpeed))), 'over', lang).catch(() => setShareError(true));
   };
 
   return <section className="rush" lang={lang} aria-label="Rare Rush">
@@ -227,6 +236,11 @@ function Ride({ friendId, collection = 'generations', client, paused }: GameComp
       </div></div>}
     </div>
     <div className="controls">
+      <button className={`turbo${s.turboTime > 0 ? ' firing' : ''}`} disabled={!active || finished || launching || s.turbos === 0} {...turboPress}
+        aria-label={t(`ターボ 残り${s.turbos}`, `Turbo, ${s.turbos} left`)} data-testid="turbo">
+        <span className="bolt" aria-hidden="true">⚡</span>{t('ターボ', 'TURBO')}
+        <span className="pips" aria-hidden="true">{[0, 1, 2].map(i => <i key={i} className={i < s.turbos ? 'on' : ''} />)}</span>
+      </button>
       <button className="hold" disabled={!active || finished} {...press('button')} aria-label={t('長押し', 'Hold')}>
         {launching ? t('長押しでチャージ → 離して発射', 'HOLD to charge → RELEASE to launch') : t('長押し：加速 / 離す：ジャンプ', 'HOLD: dive / RELEASE: fly')}
       </button>

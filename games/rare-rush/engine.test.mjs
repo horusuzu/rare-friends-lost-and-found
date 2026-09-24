@@ -124,3 +124,32 @@ test('boost gates in the air respect the speed cap', () => {
   const s = step({...onTrack(gate.x-.1,0), grounded:false, x:gate.x-.1, y:gate.y, vx:MAX_SPEED, vy:0, takeoffAt:-1}, up, 1/120);
   assert.ok(Math.hypot(s.vx,s.vy) <= MAX_SPEED + 1e-9); assert.ok(s.maxSpeed <= MAX_SPEED + 1e-9);
 });
+
+test('turbo: start with one, collect capsules up to three, fire for a burst above the normal cap', async () => {
+  const {TURBO_MAX_SPEED, MAX_TURBOS} = await import('./engine.ts');
+  const fresh = createGame(5); assert.equal(fresh.turbos, 1);
+  assert.equal(step(fresh, {hold:false, turbo:true}, 1/60).turbos, 1, 'cannot fire on the launch rail');
+  const capsule = ringsBetween(0, 4000, 5).find(r=>r.kind==='turbo'); assert.ok(capsule, 'capsules exist on the track');
+  let s = step({...onTrack(capsule.x,20), grounded:false, x:capsule.x, y:capsule.y, vx:20, vy:0, takeoffAt:-1}, up, 1/60);
+  assert.equal(s.turbos, 2); assert.equal(s.event.kind, 'item');
+  s = step({...s, x:capsule.x, y:capsule.y, vx:20, vy:0, grounded:false}, up, 1/60); assert.equal(s.turbos, 2, 'not twice');
+  assert.equal(step({...s, x:capsule.x, y:capsule.y, turbos:MAX_TURBOS, collected:[]}, up, 1/60).turbos, MAX_TURBOS, 'stock caps at three');
+  const flat = onTrack(LAUNCH_LENGTH+5, 40, {turbos:1});
+  const fired = step(flat, {hold:false, turbo:true}, 1/60);
+  assert.equal(fired.turbos, 0); assert.ok(fired.turboTime > 1.5); assert.ok(fired.speed >= 58); assert.equal(fired.event.kind, 'turbo');
+  const held = step(fired, {hold:false, turbo:true}, 1/60); assert.equal(held.turboTime < fired.turboTime, true, 'holding the key does not refire');
+  assert.equal(step(onTrack(LAUNCH_LENGTH+5, 40, {turbos:0}), {hold:false, turbo:true}, 1/60).turboTime, 0, 'empty stock does nothing');
+  let burst = onTrack(LAUNCH_LENGTH+5, MAX_SPEED, {turbos:1}); burst = step(burst, {hold:false, turbo:true}, 1/60);
+  burst = run(burst, .8); assert.ok(burst.speed > MAX_SPEED + 5 && burst.speed <= TURBO_MAX_SPEED, `turbo speed ${burst.speed}`);
+  const after = run(burst, 3); assert.equal(after.turboTime, 0); assert.ok(after.speed <= MAX_SPEED + 1e-9, 'settles back under the normal cap');
+  // Uphill during turbo still gains.
+  let x = LAUNCH_LENGTH + 5; while (trackSlope(x,5) < .5) x += 1;
+  const climb = step(step(onTrack(x, 30, {turbos:1}), {hold:false, turbo:true}, 1/60), up, 1/60);
+  assert.ok(climb.speed > 30);
+});
+
+test('turbo fired in the air pushes forward too', () => {
+  const air = {...onTrack(LAUNCH_LENGTH+300, 0), grounded:false, y:trackHeight(LAUNCH_LENGTH+300,5)+40, vx:40, vy:0, turbos:1, takeoffAt:-1};
+  const fired = step(air, {hold:false, turbo:true}, 1/60);
+  assert.ok(fired.vx > 55); assert.equal(fired.turbos, 0); assert.equal(fired.event.kind, 'turbo');
+});

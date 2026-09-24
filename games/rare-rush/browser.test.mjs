@@ -16,6 +16,12 @@ for(const [width,height] of sizes)console.log(await testGame('./games/rare-rush'
  assert.ok(Number(await game.getByTestId('speed').innerText())>=180,'perfect launch reaches 180+ km/h');
  // Ride with holds and releases; distance grows.
  for(let i=0;i<6;i++){await hold.hover();await page.mouse.down();await page.clock.runFor(700);await page.mouse.up();await page.clock.runFor(500);}
+ // Turbo: one in stock at the start; firing shows the burst and spends it.
+ const turbo=game.getByTestId('turbo');const tbb=await turbo.boundingBox();assert.ok(tbb.height>=44&&tbb.y+tbb.height<=wallet.y+1,'turbo button fits above host controls');
+ const stock=async()=>Number((await turbo.getAttribute('aria-label')).match(/\d+/)[0]);const had=await stock();assert.ok(had>=1,'starts with a turbo');
+ await turbo.hover();await page.mouse.down();await page.clock.runFor(120);await page.mouse.up();
+ await game.locator('.turbo.firing').waitFor();if(width===390||width===1100)await page.screenshot({path:`./artifacts/rush-turbo-${width}.png`});
+ assert.ok(await stock()<=had,'turbo spent');await page.clock.runFor(1500);
  const dist=Number((await game.getByTestId('distance').innerText()).replace('m',''));assert.ok(dist>150,`distance ${dist}`);
  if(width===390||width===1100)await page.screenshot({path:`./artifacts/rush-ride-${width}.png`});
  await game.getByRole('button',{name:'一時停止',exact:true}).click();await game.getByRole('heading',{name:'PAUSED',exact:true}).waitFor();
