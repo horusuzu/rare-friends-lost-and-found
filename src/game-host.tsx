@@ -14,8 +14,11 @@ import { createLiveGameClient, LIVE_GAME_MAX_ORACLE_FEE, type LiveGameDeployment
 import { fundFriendWallet } from "./friend-funding.js";
 import type { ChanceWalletClient } from "./chain.js";
 import { readGenerationEligibility, readGenesisEligibility, type GenerationIdentityClient } from "./identity.js";
-import { readOwnedFriends, type OwnedFriendsClient, type OwnedFriend } from "./owned-friends.js";
+import { FriendDiscoveryTimeoutError, readOwnedFriends, withDiscoveryDeadline, type OwnedFriendsClient, type OwnedFriend } from "./owned-friends.js";
 import { createFriendWalletSession, createFriendPublicClient, type FriendWalletProvider, type FriendWalletSession } from "./wallet.js";
+
+/** A stalled public RPC must end in a retry button, not an endless "Loading your Friends…". */
+const DISCOVERY_TIMEOUT_MS = 20_000;
 
 export type GameHostProps = {
   definition: ChanceGameDefinition;
@@ -79,14 +82,16 @@ function WalletViewport({ session, publicClient, ...props }: Omit<GameHostProps,
     const controller = new AbortController();
     const genesisEnabled = props.allowGenesisPreview && !props.deployment && props.linkedGenesisId !== undefined;
     void Promise.allSettled([
-      readOwnedFriends(publicClient, wallet.account, { signal: controller.signal }),
-      genesisEnabled ? readGenesisEligibility(publicClient, props.linkedGenesisId!, wallet.account) : Promise.resolve(null),
+      withDiscoveryDeadline(readOwnedFriends(publicClient, wallet.account, { signal: controller.signal }), DISCOVERY_TIMEOUT_MS),
+      genesisEnabled ? withDiscoveryDeadline(readGenesisEligibility(publicClient, props.linkedGenesisId!, wallet.account), DISCOVERY_TIMEOUT_MS) : Promise.resolve(null),
     ]).then(([generations, genesis]) => {
       if (controller.signal.aborted) return;
       const friends: GameFriend[] = [];
       if (genesis.status === "fulfilled" && genesis.value?.eligible) friends.push({ id: props.linkedGenesisId!, collection: "genesis", label: `Genesis #${props.linkedGenesisId}`, kind: "owned", walletAddress: genesis.value.walletAddress });
       if (generations.status === "fulfilled") friends.push(...generations.value.friends);
-      const errors = [generations.status === "rejected" ? "Could not load your Friends. Try again." : "", genesis.status === "rejected" ? "Could not verify the linked Genesis. Try again." : ""].filter(Boolean);
+      const timedOut = [generations, genesis].some(result => result.status === "rejected" && result.reason instanceof FriendDiscoveryTimeoutError);
+      const errors = timedOut ? [new FriendDiscoveryTimeoutError().message] :
+        [generations.status === "rejected" ? "Could not load your Friends. Try again." : "", genesis.status === "rejected" ? "Could not verify the linked Genesis. Try again." : ""].filter(Boolean);
       setDiscovery({ client: publicClient, session, revision: wallet.revision, attempt, friends,
         hiddenCount: generations.status === "fulfilled" ? generations.value.hiddenCount : 0, error: errors.join(" ") || undefined });
     });
