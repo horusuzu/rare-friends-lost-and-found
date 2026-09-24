@@ -3,13 +3,18 @@ import type { GameComponentProps } from '@rarefriends/friendsdk/runtime';
 import { createFriendReader, createGenesisReader } from '@rarefriends/friendsdk/sprites';
 import {
   STYLES, RARITY_LABEL, PAGE_CAP, openPack, stickerName, encodeCode, decodeCode, newAlbum, refillPacks, usePack, addSticker,
-  moveSticker, serializeAlbum, parseAlbum, type Album, type Sticker, type Collection,
+  moveSticker, serializeAlbum, parseAlbum, premiumSticker, recordRfPack, RF_PACK_OUTCOMES, MAX_ITEMS, type Album, type Sticker, type Collection,
 } from './album.js';
+import definition from './game.json' with { type: 'json' };
 import { drawSticker, type Sprite, type Tilt } from './art.js';
 import './style.css';
 
 type Lang = 'ja' | 'en';
 type Tab = 'book' | 'pack' | 'trade';
+type Snapshot = Awaited<ReturnType<GameComponentProps['client']['read']>>;
+const RF = 10n ** 18n, PACK_PRICE = BigInt(definition.price);
+const rf = (v: bigint) => `${(Number(v / 10n ** 16n) / 100).toLocaleString()} RF`;
+const ODDS = definition.outcomes.map(o => o.chanceBps / 100);
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const keyOf = (c: Collection, id: bigint) => `${c}:${id}`;
 const labelOf = (c: Collection, id: bigint) => `${c === 'genesis' ? 'Genesis' : 'Friend'} #${id}`;
@@ -74,6 +79,7 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
   const [codeInput, setCodeInput] = useState(''), [incoming, setIncoming] = useState<Sticker | null>(null), [tradeMsg, setTradeMsg] = useState('');
   const [shownCode, setShownCode] = useState<string | null>(null), [copyMsg, setCopyMsg] = useState('');
   const { sprites, load } = useSprites();
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null), [busy, setBusy] = useState(false), [rfMsg, setRfMsg] = useState('');
   const saving = useRef(false), dirty = useRef(false), latest = useRef<Album | null>(null), modalClose = useRef<HTMLButtonElement>(null), alive = useRef(true), pageRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ index: number; id: number; sx: number; sy: number; moved: boolean } | null>(null);
   const [dragPos, setDragPos] = useState<{ index: number; x: number; y: number } | null>(null);
@@ -87,7 +93,8 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
     alive.current = true; setError(false); setAlbum(null);
     let current = true;
     void (async () => {
-      await client.read();
+      const snap = await client.read();
+      if (current) setSnapshot(snap);
       // If the saved book cannot be read, stop instead of starting a new book that would overwrite it.
       let book: Album;
       try { book = parseAlbum(await (client.loadLocal?.() ?? Promise.resolve(null))) ?? newAlbum(today()); }
@@ -125,10 +132,45 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
     try {
       const sticker = openPack({ collection: owner, tokenId: friendId }, newSeed());
       const next = addSticker(usePack(album), sticker, 'pack', newSeed());
-      commit(next); setOpening(sticker); setPage(next.items[next.items.length - 1].page);
-      if (reduced) { setPhase('reveal'); return; }
-      setPhase('tear'); setTimeout(() => { if (alive.current) setPhase('reveal'); }, 900);
+      commit(next); reveal(sticker, next);
     } catch (e) { setTradeMsg((e as Error).message); }
+  }
+
+  const refresh = () => client.read().then(s => { if (alive.current) setSnapshot(s); }, () => undefined);
+  const reveal = (sticker: Sticker, next: Album) => {
+    setOpening(sticker); setPage(next.items[next.items.length - 1].page);
+    if (reduced) { setPhase('reveal'); return; }
+    setPhase('tear'); setTimeout(() => { if (alive.current) setPhase('reveal'); }, 900);
+  };
+
+  /** RF pack: buy (if needed) → play → settle through the SDK; the SDK outcome picks the finish. */
+  async function openRfPack() {
+    if (!album || paused || busy || phase !== 'idle') return;
+    if (album.items.length >= MAX_ITEMS) { setRfMsg(t('シール帳がいっぱいです。', 'Your sticker book is full.')); return; }
+    setBusy(true); setRfMsg('');
+    try {
+      const snap = await client.read();
+      let play = snap.plays.find(p => p.outcomeId === null);
+      if (!play) {
+        if (snap.consumables === 0n) await client.buy(1n);
+        [play] = await client.play(1n);
+      }
+      const outcome = play.outcomeId ?? (await client.settle(play.id)).outcomeId;
+      if (outcome === null) { setRfMsg(t('結果がまだ確定していません。少し待ってからもう一度押してください。', 'The result is not final yet. Wait a moment and try again.')); return; }
+      const sticker = premiumSticker({ collection: owner, tokenId: friendId }, outcome, Number(play.id % 0x7fffffffn) ^ newSeed());
+      const next = addSticker(recordRfPack(latest.current ?? album), sticker, 'pack', newSeed());
+      commit(next); reveal(sticker, next);
+    } catch (e) {
+      const m = e instanceof Error ? e.message : '';
+      setRfMsg(/cancel/i.test(m) ? t('キャンセルしました。', 'Cancelled.') : t(`RFパックを開けられませんでした。${m}`, `Could not open the RF pack. ${m}`));
+    } finally { await refresh(); if (alive.current) setBusy(false); }
+  }
+  async function claimGold(count: bigint) {
+    if (paused || busy || count === 0n) return;
+    setBusy(true); setRfMsg('');
+    try { await client.redeem(RF_PACK_OUTCOMES.length, count); setRfMsg(t(`金箔ボーナス ${rf(count * BigInt(definition.outcomes[3].reward))} を受け取りました。`, `Claimed ${rf(count * BigInt(definition.outcomes[3].reward))} gold bonus.`)); }
+    catch (e) { setRfMsg(/cancel/i.test(e instanceof Error ? e.message : '') ? t('キャンセルしました。', 'Cancelled.') : t('受け取れませんでした。', 'Could not claim the bonus.')); }
+    finally { await refresh(); if (alive.current) setBusy(false); }
   }
 
   function checkCode() {
@@ -218,8 +260,8 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
         <span>{page + 1} / {pages}</span>
         <button disabled={page >= pages - 1} onClick={() => setPage(p => p + 1)} aria-label={t('次のページ', 'Next page')}>▶</button>
       </div>
-      <p className="stats">{t(`${album.items.length}枚 · ${friendsCollected}体のFriend · 1ページ${PAGE_CAP}枚まで · ドラッグで貼りなおし、タップで拡大`,
-        `${album.items.length} stickers · ${friendsCollected} Friends · ${PAGE_CAP} per page · drag to move, tap to view`)}</p>
+      <p className="stats">{t(`${album.items.length}枚 · ${friendsCollected}体のFriend · 使ったRF ${rf(BigInt(album.rfPacks) * PACK_PRICE)} · ドラッグで貼りなおし、タップで拡大`,
+        `${album.items.length} stickers · ${friendsCollected} Friends · ${rf(BigInt(album.rfPacks) * PACK_PRICE)} spent · drag to move, tap to view`)}</p>
       <ul className="collection" aria-label={t('種類', 'Finishes')}>{STYLES.map((st, i) => <li key={st.id} className={counts[i] ? 'got' : ''}>{st[lang]} <b>{counts[i]}</b></li>)}</ul>
     </div>}
 
@@ -233,6 +275,27 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
             <small>{t('シール帳に貼りました · タップで次へ', 'Stuck in your book · tap to continue')}</small></span>
           : <span className="wrapper"><em>RARE<br />STICKERS</em><small>{phase === 'tear' ? t('ビリビリ…', 'Tearing…') : album.packs ? t(`タップで開ける（のこり${album.packs}）`, `Tap to open (${album.packs} left)`) : t('今日のパックはおしまい。また明日！', 'No packs left today. Come back tomorrow!')}</small></span>}
       </button>
+      {(() => {
+        const pending = snapshot?.plays.some(p => p.outcomeId === null) ?? false, gold = snapshot?.inventory[3] ?? 0n;
+        const preview = client.mode === 'preview', canAfford = !!snapshot && (snapshot.consumables > 0n || snapshot.rfBalance >= PACK_PRICE);
+        return <section className="rf-pack" aria-label={t('RFパック', 'RF packs')}>
+          <h2>{t('RFパック', 'RF pack')} <b>{rf(PACK_PRICE)}</b></h2>
+          <p>{t(`ノーマルなし！ ${RF_PACK_OUTCOMES.map((o, i) => `${o[0]} ${ODDS[i]}%`).join(' / ')}（金箔は ${rf(BigInt(definition.outcomes[3].reward))} のおまけ付き）`,
+            `No commons! ${RF_PACK_OUTCOMES.map((o, i) => `${o[1]} ${ODDS[i]}%`).join(' / ')} (gold foil includes a ${rf(BigInt(definition.outcomes[3].reward))} bonus)`)}</p>
+          <button className="rf-open" onClick={() => void openRfPack()} disabled={paused || busy || phase !== 'idle' || !snapshot || (!pending && !canAfford)}>
+            {busy ? t('処理中…', 'Working…') : pending ? t('開けかけのRFパックを開ける', 'Open your pending RF pack') : t(`RFパックを開ける（${rf(PACK_PRICE)}）`, `Open an RF pack (${rf(PACK_PRICE)})`)}
+          </button>
+          <dl className="rf-stats">
+            <div><dt>{preview ? t('残高（模擬RF）', 'Balance (simulated RF)') : t('Friendウォレットの残高', 'Friend wallet RF')}</dt><dd data-testid="rf-balance">{snapshot ? rf(snapshot.rfBalance) : '—'}</dd></div>
+            <div><dt>{t('これまでに使ったRF', 'RF spent so far')}</dt><dd data-testid="rf-spent">{rf(BigInt(album.rfPacks) * PACK_PRICE)}</dd></div>
+          </dl>
+          {gold > 0n && <button className="gold-claim" onClick={() => void claimGold(gold)} disabled={paused || busy}>{t(`金箔ボーナス ${rf(gold * BigInt(definition.outcomes[3].reward))} を受け取る`, `Claim ${rf(gold * BigInt(definition.outcomes[3].reward))} gold bonus`)}</button>}
+          {rfMsg && <p className="rf-msg" role="status">{rfMsg}</p>}
+          <p className="note">{preview
+            ? t('お試し版では残高と抽選結果は模擬です（実際のRFは動きません）。本番ではRFの支払いと抽選がブロックチェーン上で行われ、購入ごとにウォレットの確認があります。', 'Preview: balances and draws are simulated; no real RF moves. Live, the RF payment and draw happen on-chain with a wallet confirmation for each purchase.')
+            : t('RFの支払いと抽選はブロックチェーン上で行われます。', 'RF payments and draws happen on-chain.')}</p>
+        </section>;
+      })()}
       <h2 className="samples-title">{t('シールの種類（見本）', 'Sticker finishes (samples)')}</h2>
       <ul className="samples">{STYLES.map((st, i) => {
         const sample = samples[i];

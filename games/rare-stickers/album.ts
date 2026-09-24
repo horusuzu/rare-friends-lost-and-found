@@ -8,7 +8,8 @@ export interface Owner { collection: Collection; tokenId: bigint }
 export interface Sticker extends Owner { style: number; backdrop: number; hue: number; nameA: number; nameB: number; serial: number }
 export type Source = 'pack' | 'trade';
 export interface Placed { sticker: Sticker; source: Source; page: number; x: number; y: number; rot: number }
-export interface Album { version: 1; packs: number; day: string; items: Placed[] }
+/** rfPacks: RF packs opened so far (RF spent = rfPacks × pack price). */
+export interface Album { version: 1; packs: number; day: string; rfPacks: number; items: Placed[] }
 
 export interface Style { id: string; ja: string; en: string; rarity: 1 | 2 | 3 | 4; weight: number }
 export const STYLES: readonly Style[] = [
@@ -63,6 +64,19 @@ export function openPack(owner: Owner, seed: number): Sticker {
     serial: 1 + Math.floor(next() * 9999),
   };
 }
+
+/**
+ * RF packs use the SDK chance game: outcome ids 1–4 (see game.json) pick the rarity, the seed the design.
+ * 1 = rare (puffy, clear or glitter), 2 = holo, 3 = prism, 4 = gold foil.
+ */
+export const RF_PACK_OUTCOMES = [['レア', 'Rare'], ['ホロ', 'Holo'], ['プリズム', 'Prism'], ['金箔', 'Gold Foil']] as const;
+export function premiumSticker(owner: Owner, outcomeId: number, seed: number): Sticker {
+  if (!Number.isInteger(outcomeId) || outcomeId < 1 || outcomeId > RF_PACK_OUTCOMES.length) throw new Error('Unknown pack outcome.');
+  const base = openPack(owner, seed);
+  const style = outcomeId === 1 ? 2 + Math.floor(rng(seed ^ 0x5bd1e995)() * 3) : outcomeId + 3;
+  return { ...base, style };
+}
+export function recordRfPack(album: Album): Album { return { ...album, rfPacks: album.rfPacks + 1 }; }
 
 export function stickerName(s: Sticker, lang: 'ja' | 'en'): string {
   const i = lang === 'ja' ? 0 : 1;
@@ -125,7 +139,7 @@ export function decodeCode(input: string): Sticker {
 }
 
 // ---- Album ----
-export function newAlbum(day: string): Album { return { version: 1, packs: PACKS_PER_DAY, day, items: [] }; }
+export function newAlbum(day: string): Album { return { version: 1, packs: PACKS_PER_DAY, day, rfPacks: 0, items: [] }; }
 
 export function refillPacks(album: Album, day: string): Album {
   if (day <= album.day) return album;
@@ -162,20 +176,20 @@ export function moveSticker(album: Album, index: number, x: number, y: number): 
 type StoredItem = [code: string, source: 'p' | 't', page: number, x: number, y: number, rot: number];
 export function serializeAlbum(album: Album): string {
   const items: StoredItem[] = album.items.map(it => [encodeCode(it.sticker), it.source === 'pack' ? 'p' : 't', it.page, Math.round(it.x * 1000), Math.round(it.y * 1000), Math.round(it.rot * 1000)]);
-  return JSON.stringify({ version: 1, packs: album.packs, day: album.day, items });
+  return JSON.stringify({ version: 1, packs: album.packs, day: album.day, rfPacks: album.rfPacks, items });
 }
 
 export function parseAlbum(raw: string | null): Album | null {
   if (raw === null) return null;
-  const v = JSON.parse(raw) as { version?: unknown; packs?: unknown; day?: unknown; items?: unknown };
+  const v = JSON.parse(raw) as { version?: unknown; packs?: unknown; day?: unknown; rfPacks?: unknown; items?: unknown };
   const int = (n: unknown, min: number, max: number) => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
   if (v.version !== 1 || !int(v.packs, 0, MAX_PACKS) || typeof v.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v.day) ||
-      !Array.isArray(v.items) || v.items.length > MAX_ITEMS) throw new Error('Invalid sticker book.');
+      !Array.isArray(v.items) || v.items.length > MAX_ITEMS || (v.rfPacks !== undefined && !int(v.rfPacks, 0, 1_000_000))) throw new Error('Invalid sticker book.');
   const items = v.items.map((raw: unknown): Placed => {
     if (!Array.isArray(raw) || raw.length !== 6) throw new Error('Invalid sticker book.');
     const [code, source, page, x, y, rot] = raw as StoredItem;
     if (typeof code !== 'string' || (source !== 'p' && source !== 't') || !int(page, 0, MAX_ITEMS) || !int(x, 0, 1000) || !int(y, 0, 1000) || !int(rot, -250, 250)) throw new Error('Invalid sticker book.');
     return { sticker: decodeCode(code), source: source === 'p' ? 'pack' : 'trade', page, x: x / 1000, y: y / 1000, rot: rot / 1000 };
   });
-  return { version: 1, packs: v.packs as number, day: v.day, items };
+  return { version: 1, packs: v.packs as number, day: v.day, rfPacks: (v.rfPacks as number | undefined) ?? 0, items };
 }

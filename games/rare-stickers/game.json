@@ -1,13 +1,12 @@
 {
   "name": "Rare Stickers",
-  "consumable": "Unused arcade schema placeholder",
-  "price": "1",
+  "consumable": "RF sticker pack",
+  "price": "2000000000000000000",
   "outcomes": [
-    {
-      "name": "Unused; no token payout",
-      "chanceBps": 10000,
-      "reward": "1"
-    }
+    { "name": "Rare sticker (puffy, clear or glitter)", "chanceBps": 6000, "reward": "0" },
+    { "name": "Holo sticker", "chanceBps": 3000, "reward": "0" },
+    { "name": "Prism sticker", "chanceBps": 700, "reward": "0" },
+    { "name": "Gold foil sticker with 1 RF bonus", "chanceBps": 300, "reward": "1000000000000000000" }
   ],
   "linkedGenesisId": "597",
   "allowGenesisPreview": true

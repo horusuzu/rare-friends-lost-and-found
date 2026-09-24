@@ -71,3 +71,19 @@ test('albums save compactly and reject tampered or oversized data', () => {
     JSON.stringify({...JSON.parse(raw), items:new Array(MAX_ITEMS + 1).fill(JSON.parse(raw).items[0])})]) assert.throws(() => parseAlbum(bad));
   assert.equal(parseAlbum(null), null);
 });
+
+test('RF packs: the SDK outcome decides the finish; RF spent is counted and saved', async () => {
+  const {premiumSticker, recordRfPack, RF_PACK_OUTCOMES} = await import('./album.ts');
+  assert.equal(RF_PACK_OUTCOMES.length, 4);
+  const styleOf = id => STYLES[premiumSticker(me, id, 5).style].id;
+  for (let seed = 0; seed < 50; seed++) assert.ok(['puffy', 'clear', 'glitter'].includes(STYLES[premiumSticker(me, 1, seed).style].id));
+  assert.equal(styleOf(2), 'holo'); assert.equal(styleOf(3), 'prism'); assert.equal(styleOf(4), 'gold');
+  assert.equal(premiumSticker(me, 4, 5).tokenId, 7730n);
+  assert.throws(() => premiumSticker(me, 0, 1), /outcome/i); assert.throws(() => premiumSticker(me, 5, 1), /outcome/i);
+  let a = newAlbum('2026-09-24'); assert.equal(a.rfPacks, 0);
+  a = recordRfPack(recordRfPack(a)); assert.equal(a.rfPacks, 2);
+  assert.deepEqual(parseAlbum(serializeAlbum(a)), a);
+  const old = JSON.parse(serializeAlbum(a)); delete old.rfPacks;
+  assert.equal(parseAlbum(JSON.stringify(old)).rfPacks, 0, 'older saves without the counter still load');
+  assert.throws(() => parseAlbum(JSON.stringify({...old, rfPacks:-1})));
+});

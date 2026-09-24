@@ -16,6 +16,13 @@ Chain (4663). No transaction or signature is involved. Japanese and English.
 - **Finishes and odds:** Matte 30 %, Patch (embroidered) 18 %, Puffy (raised, glossy) 14 %,
   Clear (see-through vinyl) 12 %, Glitter 11 %, Holo (aurora foil) 7 %, Prism (burst backdrop with
   diamond rainbow foil, like classic collectible stickers) 5 %, Gold Foil 3 %.
+- **RF packs ($RAREFRIENDS):** besides the free packs, an RF pack costs **2 RF** through the SDK
+  chance game (`game.json`: consumable "RF sticker pack"). The host confirms each purchase and draw;
+  the SDK outcome decides the finish — Rare (puffy/clear/glitter) 60 %, Holo 30 %, Prism 7 %,
+  Gold Foil 3 % — with no commons. Gold Foil includes a 1 RF bonus that can be claimed (redeemed).
+  Expected return is 0.03 RF per 2 RF pack, so about 98.5 % of RF spent stays spent. A pack
+  bought or drawn but not yet revealed (e.g. after a reload) is resumed by its existing play id;
+  no new pack is consumed to recover it. The book shows the total RF spent.
 - **Sticker book:** stickers land on the current page (eight per page, new pages as needed).
   Drag to re-stick anywhere; tap to see it large — shiny finishes glint as you move the pointer.
 - **Trade:** tap a sticker → "Show trade code" (e.g. `RF-XXXX-XXXX-XXXX`), send it to a friend,
@@ -23,9 +30,14 @@ Chain (4663). No transaction or signature is involved. Japanese and English.
   from the chain and adds the sticker. Your own Friend comes only from packs; other Friends only
   from trades. The same traded code can be added once.
 
+In this preview the RF balance (20 simulated RF), purchases and draws come from the SDK's simulated
+ledger: no real RF moves. A live deployment would run the same buy → play → settle → redeem calls
+on-chain with wallet confirmations; that phase needs the Rare Friends team and is not part of this
+preview. Free packs never touch RF.
+
 Trade codes carry a sticker design with a CRC-16 checksum against typos. They are not proofs of
 ownership, not signed and not scarce: a code can be shared with several people. Stickers and packs
-have no monetary value, no RF is spent or paid, and the SDK chance-game schema is unused.
+have no monetary value. Only RF packs use RF (simulated here).
 SDK v0.1.2 has no trading capability; real transfers would need a separately scoped integration.
 
 The book (up to 150 stickers) is saved locally for this browser and NFT session via the SDK's
