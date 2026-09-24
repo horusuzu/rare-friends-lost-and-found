@@ -85,7 +85,7 @@ export function stickerName(s: Sticker, lang: 'ja' | 'en'): string {
 
 // ---- Trade codes: version, packed fields, LEB128 token id, CRC-16, Crockford base32. ----
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
-function crc16(bytes: number[]): number {
+export function crc16(bytes: number[]): number {
   let crc = 0xffff;
   for (const b of bytes) {
     crc ^= b << 8;
@@ -93,13 +93,13 @@ function crc16(bytes: number[]): number {
   }
   return crc;
 }
-function toBase32(bytes: number[]): string {
+export function toBase32(bytes: number[]): string {
   let bits = 0, value = 0, out = '';
   for (const b of bytes) { value = (value << 8) | b; bits += 8; while (bits >= 5) { out += ALPHABET[(value >>> (bits - 5)) & 31]; bits -= 5; } value &= (1 << bits) - 1; }
   if (bits > 0) out += ALPHABET[(value << (5 - bits)) & 31];
   return out;
 }
-function fromBase32(text: string): number[] {
+export function fromBase32(text: string): number[] {
   let bits = 0, value = 0; const out: number[] = [];
   for (const ch of text) {
     const v = ALPHABET.indexOf(ch);
@@ -110,10 +110,32 @@ function fromBase32(text: string): number[] {
   return out;
 }
 
+export function varint(value: bigint): number[] {
+  const out: number[] = []; let id = value;
+  do { const low = Number(id & 0x7fn); id >>= 7n; out.push(id > 0n ? low | 0x80 : low); } while (id > 0n);
+  return out;
+}
+/** Reads a LEB128 token id; returns [id, next offset]. Throws on overlong or truncated input. */
+export function readVarint(bytes: number[], start: number): [bigint, number] {
+  let value = 0n, shift = 0n, i = start;
+  for (; i < bytes.length; i++) { value |= BigInt(bytes[i] & 0x7f) << shift; shift += 7n; if (!(bytes[i] & 0x80)) break; }
+  if (i >= bytes.length || shift > 70n) throw new Error('This is not a sticker code.');
+  return [value, i + 1];
+}
+/** Sticker fields without version or checksum, shared by sticker and battle codes. */
+export function stickerBytes(s: Sticker): number[] {
+  return [s.style | (s.backdrop << 3) | (s.collection === 'genesis' ? 64 : 0), s.hue, (s.nameA << 4) | s.nameB, s.serial >> 8, s.serial & 255, ...varint(s.tokenId)];
+}
+export function readSticker(bytes: number[], start: number): [Sticker, number] {
+  if (start + 6 > bytes.length) throw new Error('This is not a sticker code.');
+  const [flags, hue, names, hi, lo] = bytes.slice(start, start + 5), serial = (hi << 8) | lo;
+  if (hue > 11 || serial < 1 || serial > 9999 || (flags & 128)) throw new Error('This is not a sticker code.');
+  const [tokenId, next] = readVarint(bytes, start + 5);
+  return [{ collection: flags & 64 ? 'genesis' : 'generations', tokenId, style: flags & 7, backdrop: (flags >> 3) & 7, hue, nameA: names >> 4, nameB: names & 15, serial }, next];
+}
+
 export function encodeCode(s: Sticker): string {
-  const bytes = [1, s.style | (s.backdrop << 3) | (s.collection === 'genesis' ? 64 : 0), s.hue, (s.nameA << 4) | s.nameB, s.serial >> 8, s.serial & 255];
-  let id = s.tokenId;
-  do { const low = Number(id & 0x7fn); id >>= 7n; bytes.push(id > 0n ? low | 0x80 : low); } while (id > 0n);
+  const bytes = [1, ...stickerBytes(s)];
   const crc = crc16(bytes);
   const body = toBase32([...bytes, crc >> 8, crc & 255]);
   return `RF-${body.match(/.{1,4}/g)!.join('-')}`;
@@ -127,15 +149,9 @@ export function decodeCode(input: string): Sticker {
   const payload = bytes.slice(0, -2), crc = (bytes.at(-2)! << 8) | bytes.at(-1)!;
   if (payload.length < 7 || crc16(payload) !== crc || toBase32(bytes) !== cleaned) throw new Error('This sticker code has a typo. Check it and try again.');
   if (payload[0] !== 1) throw new Error('This sticker code is from a newer version.');
-  let tokenId = 0n, shift = 0n, i = 6;
-  for (; i < payload.length; i++) { tokenId |= BigInt(payload[i] & 0x7f) << shift; shift += 7n; if (!(payload[i] & 0x80)) break; }
-  if (i !== payload.length - 1 || shift > 70n) throw new Error('This is not a sticker code.');
-  const hue = payload[2], serial = (payload[4] << 8) | payload[5];
-  if (hue > 11 || serial < 1 || serial > 9999 || (payload[1] & 128)) throw new Error('This is not a sticker code.');
-  return {
-    collection: payload[1] & 64 ? 'genesis' : 'generations', tokenId,
-    style: payload[1] & 7, backdrop: (payload[1] >> 3) & 7, hue, nameA: payload[3] >> 4, nameB: payload[3] & 15, serial,
-  };
+  const [sticker, end] = readSticker(payload, 1);
+  if (end !== payload.length) throw new Error('This is not a sticker code.');
+  return sticker;
 }
 
 // ---- Album ----
