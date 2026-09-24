@@ -131,9 +131,10 @@ function nameplate(c: CanvasRenderingContext2D, s: Sticker, S: number, lang: 'ja
 }
 
 /** Draw a whole sticker into a square canvas of side S. */
-export function drawSticker(c: CanvasRenderingContext2D, s: Sticker, rows: Sprite | null, S: number, lang: 'ja' | 'en', tilt: Tilt = { x: 0, y: 0 }, time = 0): void {
+export function drawSticker(c: CanvasRenderingContext2D, s: Sticker, rows: Sprite | null, S: number, lang: 'ja' | 'en', tilt: Tilt = { x: 0, y: 0 }, time = 0, clear = true): void {
   const hue = HUES[s.hue], id = STYLES[s.style].id, radius = S * 0.1;
-  c.clearRect(0, 0, S, S); c.save();
+  if (clear) c.clearRect(0, 0, S, S);
+  c.save();
   if (id === 'clear') {
     // Clear vinyl: no card, a thin white die-cut around the Friend and a glassy streak.
     c.fillStyle = 'rgba(255,255,255,.14)'; roundRect(c, S * 0.04, S * 0.04, S * 0.92, S * 0.92, radius); c.fill();
@@ -209,4 +210,49 @@ export function drawSticker(c: CanvasRenderingContext2D, s: Sticker, rows: Sprit
   }
   nameplate(c, s, S, lang, '#fff', id === 'prism' ? 'rgba(20,10,40,.8)' : hsl(hue, 55, 25, 0.8));
   c.restore();
+}
+
+/** Card frame per element: sun, moon, star. */
+const FRAMES = [
+  { edge: '#ff8a3d', deep: '#b8461a', glow: '#ffd36b', icon: '☀' },
+  { edge: '#7a8cff', deep: '#3a3f9e', glow: '#c8d0ff', icon: '☾' },
+  { edge: '#ffd24a', deep: '#a37a00', glow: '#fff6b8', icon: '★' },
+];
+export const CARD_RATIO = 7 / 5;
+
+/**
+ * Trading card of width W (height W × 7/5): element frame, HP, the sticker as the art window,
+ * and ATK / DEF. Stats come from cards.ts so the card shows exactly what battles use.
+ */
+export function drawCard(c: CanvasRenderingContext2D, s: Sticker, rows: Sprite | null, W: number, lang: 'ja' | 'en',
+  stats: { hp: number; atk: number; def: number; element: number; rarity: number }, elementName: string, tilt: Tilt = { x: 0, y: 0 }, time = 0): void {
+  const H = Math.round(W * CARD_RATIO), f = FRAMES[stats.element], pad = W * 0.06, art = W - pad * 2;
+  c.clearRect(0, 0, W, H);
+  const body = c.createLinearGradient(0, 0, W, H);
+  body.addColorStop(0, f.glow); body.addColorStop(0.5, f.edge); body.addColorStop(1, f.deep);
+  c.fillStyle = body; roundRect(c, 0, 0, W, H, W * 0.07); c.fill();
+  c.fillStyle = 'rgba(255,255,255,.9)'; roundRect(c, pad * 0.5, pad * 0.5, W - pad, H - pad, W * 0.05); c.fill();
+  c.fillStyle = f.deep; c.textBaseline = 'middle';
+  c.font = `900 ${Math.round(W * 0.075)}px system-ui, sans-serif`; c.textAlign = 'left';
+  c.fillText(`${f.icon} ${elementName}`, pad * 1.1, pad + W * 0.05);
+  c.textAlign = 'right'; c.fillText(`HP ${stats.hp}`, W - pad * 1.1, pad + W * 0.05);
+  c.save(); c.translate(pad, pad + W * 0.11);
+  drawSticker(c, s, rows, art, lang, tilt, time, false);
+  c.restore();
+  const y = pad + W * 0.11 + art + W * 0.035, box = (W - pad * 2 - W * 0.03) / 2;
+  for (const [i, label, value] of [[0, lang === 'ja' ? 'こうげき' : 'ATK', stats.atk], [1, lang === 'ja' ? 'ぼうぎょ' : 'DEF', stats.def]] as const) {
+    const x = pad + i * (box + W * 0.03);
+    c.fillStyle = i === 0 ? '#ffe3e0' : '#e0ecff'; roundRect(c, x, y, box, H - y - pad * 0.9, W * 0.03); c.fill();
+    c.fillStyle = '#3a2748'; c.textAlign = 'center';
+    c.font = `800 ${Math.round(W * 0.05)}px system-ui, sans-serif`; c.fillText(label, x + box / 2, y + (H - y - pad) * 0.3);
+    c.font = `900 ${Math.round(W * 0.1)}px system-ui, sans-serif`; c.fillText(String(value), x + box / 2, y + (H - y - pad) * 0.72);
+  }
+  if (stats.rarity >= 3) {
+    // Foil edge on shiny cards.
+    c.save(); c.globalCompositeOperation = 'overlay'; c.globalAlpha = 0.5;
+    const g = c.createLinearGradient((tilt.x - 1) * W, 0, (tilt.x + 2) * W, H);
+    ['#ff5fd2', '#ffd36b', '#8dff9b', '#5ff2ff', '#a78bff'].forEach((col, i, a) => g.addColorStop(i / (a.length - 1), col));
+    c.strokeStyle = g; c.lineWidth = pad * 0.9; roundRect(c, pad * 0.25, pad * 0.25, W - pad * 0.5, H - pad * 0.5, W * 0.06); c.stroke();
+    c.restore();
+  }
 }

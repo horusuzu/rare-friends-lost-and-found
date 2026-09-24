@@ -1,12 +1,28 @@
 {
   "name": "Rare Stickers",
-  "consumable": "RF sticker pack",
+  "consumable": "RF ticket",
   "price": "2000000000000000000",
   "outcomes": [
-    { "name": "Rare sticker (puffy, clear or glitter)", "chanceBps": 6000, "reward": "0" },
-    { "name": "Holo sticker", "chanceBps": 3000, "reward": "0" },
-    { "name": "Prism sticker", "chanceBps": 700, "reward": "0" },
-    { "name": "Gold foil sticker with 1 RF bonus", "chanceBps": 300, "reward": "1000000000000000000" }
+    {
+      "name": "Rare card (pack) / burn receipt (battle)",
+      "chanceBps": 6000,
+      "reward": "0"
+    },
+    {
+      "name": "Holo card (pack) / burn receipt (battle)",
+      "chanceBps": 3000,
+      "reward": "0"
+    },
+    {
+      "name": "Prism card (pack) / burn receipt (battle)",
+      "chanceBps": 700,
+      "reward": "0"
+    },
+    {
+      "name": "Gold foil card with 1 RF bonus",
+      "chanceBps": 300,
+      "reward": "1000000000000000000"
+    }
   ],
   "linkedGenesisId": "597",
   "allowGenesisPreview": true

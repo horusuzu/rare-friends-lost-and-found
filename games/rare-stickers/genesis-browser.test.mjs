@@ -12,18 +12,18 @@ for(const width of [390,1100]){
  await page.goto(origin);await page.getByRole('button',{name:/^Connect (wallet|Browser wallet)$/}).click();
  await page.getByRole('button',{name:/^Genesis #597/}).waitFor();await page.getByRole('button',{name:/^Friend #7730/}).waitFor();
  await page.getByRole('button',{name:/^Genesis #597/}).click();
- await game.getByText('パックを開けて、シールを貼ろう！').waitFor();assert.ok(fixture.genesisReads>=2);
+ await game.getByText('パックを開けて、カードを集めよう！').waitFor();assert.ok(fixture.genesisReads>=2);
  // Trade: as Genesis #597, receive a sticker of Friend #7730 (art read from the chain fixture).
  const code=encodeCode({collection:'generations',tokenId:7730n,style:6,backdrop:0,hue:4,nameA:1,nameB:2,serial:4321});
  await game.getByRole('button',{name:/^交換/}).click();const input=game.getByRole('textbox',{name:'友だちの交換コード'});
  await input.fill(code.toLowerCase().replaceAll('-',' '));await game.getByRole('button',{name:'コードを確かめる'}).click();
  await game.getByRole('img',{name:/プリズム/}).waitFor().catch(()=>{});if(width===390||width===1100)await page.screenshot({path:`./artifacts/stickers-trade-${width}.png`});
- await game.getByRole('button',{name:'シール帳に貼る'}).click();assert.equal(await game.locator('.placed').count(),1,'traded sticker added to the book');
+ await game.getByRole('button',{name:'シール帳に貼る'}).click();assert.equal(await game.locator('.pocket:not(.empty-pocket)').count(),1,'traded sticker added to the book');
  await game.getByRole('button',{name:/^交換/}).click();await input.fill(code);await game.getByRole('button',{name:'コードを確かめる'}).click();await game.getByRole('button',{name:'シール帳に貼る'}).click();
- await game.getByText('このシールはもうシール帳にあります。').waitFor();await game.getByRole('button',{name:'シール帳',exact:true}).click();
+ await game.getByText('このシールはもうシール帳にあります。').waitFor();await game.getByRole('button',{name:'カード帳',exact:true}).click();
  await game.getByRole('img',{name:'Genesis #597',exact:true,includeHidden:true}).waitFor({state:'attached'});
  await game.getByRole('button',{name:/^パック/}).click();await game.getByRole('button',{name:/^パックを開ける/}).click();await game.getByText('シール帳に貼りました · タップで次へ').waitFor({timeout:5000}).catch(()=>{});
- await page.getByRole('button',{name:'Choose Friend',exact:true}).click();await page.getByRole('button',{name:/^Friend #7730/}).click();await game.getByText('パックを開けて、シールを貼ろう！').waitFor();
+ await page.getByRole('button',{name:'Choose Friend',exact:true}).click();await page.getByRole('button',{name:/^Friend #7730/}).click();await game.getByText('パックを開けて、カードを集めよう！').waitFor();
  await page.getByRole('button',{name:'Choose Friend',exact:true}).click();fixture.genesisOwner=SECOND_OWNER;await page.getByRole('button',{name:/^Genesis #597/}).click();await page.getByText('このウォレットは選択したGenesisを所有していません。',{exact:true}).waitFor();assert.equal(await page.locator('iframe').count(),0);
  assert.deepEqual(errors,[]);assert.deepEqual(fixture.errors,[]);const requests=await page.evaluate(()=>window.__friendWalletTest.state.requests);assert.ok(requests.every(m=>['eth_accounts','eth_requestAccounts','eth_chainId'].includes(m)));console.log(`Genesis selection, launch and transferred-owner rejection PASS ${width}`);
  }finally{await browser?.close();if(server)await new Promise(r=>server.close(r));await rm(dir,{recursive:true,force:true});}

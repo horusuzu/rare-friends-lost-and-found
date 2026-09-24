@@ -1,47 +1,70 @@
-# Rare Stickers / レアシール帳
+# Rare Cards / レアトレカ
 
-A sticker book for your verified Rare Friends NFT. Open daily packs to turn your own Friend
-into collectible stickers in eight finishes, stick them anywhere on the pages of your book,
-and trade sticker designs with other holders using short trade codes. Built with FriendSDK
-0.1.2, React and Canvas.
+A trading-card game for your verified Rare Friends NFT. Open packs that turn your own Friend
+into cards in eight finishes, keep them in a nine-pocket binder, trade card designs with other
+holders, and battle them with five-card decks — each player burning an RF ticket to enter.
+Built with FriendSDK 0.1.2, React and Canvas.
 
 ## Play
 
 Connect through the SDK host and choose an owned Generations NFT (generation 1+), or the
 configured Genesis #597. The host checks current collection-specific ownership on Robinhood
-Chain (4663). No transaction or signature is involved. Japanese and English.
+Chain (4663). Japanese and English.
 
-- **Packs:** three free packs a day (stock up to nine). Each pack is one sticker of your own
-  Friend with a random finish, backdrop, colour, name and serial number.
-- **Finishes and odds:** Matte 30 %, Patch (embroidered) 18 %, Puffy (raised, glossy) 14 %,
-  Clear (see-through vinyl) 12 %, Glitter 11 %, Holo (aurora foil) 7 %, Prism (burst backdrop with
-  diamond rainbow foil, like classic collectible stickers) 5 %, Gold Foil 3 %.
-- **RF packs ($RAREFRIENDS):** besides the free packs, an RF pack costs **2 RF** through the SDK
-  chance game (`game.json`: consumable "RF sticker pack"). The host confirms each purchase and draw;
-  the SDK outcome decides the finish — Rare (puffy/clear/glitter) 60 %, Holo 30 %, Prism 7 %,
-  Gold Foil 3 % — with no commons. Gold Foil includes a 1 RF bonus that can be claimed (redeemed).
-  Expected return is 0.03 RF per 2 RF pack, so about 98.5 % of RF spent stays spent. A pack
-  bought or drawn but not yet revealed (e.g. after a reload) is resumed by its existing play id;
-  no new pack is consumed to recover it. The book shows the total RF spent.
-- **Sticker book:** stickers land on the current page (eight per page, new pages as needed).
-  Drag to re-stick anywhere; tap to see it large — shiny finishes glint as you move the pointer.
-- **Trade:** tap a sticker → "Show trade code" (e.g. `RF-XXXX-XXXX-XXXX`), send it to a friend,
-  and paste their code in the Trade tab. The receiving book reads that Friend's canonical art
-  from the chain and adds the sticker. Your own Friend comes only from packs; other Friends only
-  from trades. The same traded code can be added once.
+- **Cards:** every card is a sticker of a Friend in one of eight finishes — Matte, Patch
+  (embroidered), Puffy (raised), Clear, Glitter, Holo, Prism (burst backdrop with diamond rainbow
+  foil) and Gold Foil. Rarer finishes are stronger. Each card shows its element (Sun, Moon or Star),
+  HP, attack and defence, all derived from the card itself.
+- **Free packs:** three a day (stock up to nine), one card of your own Friend each.
+  Odds: Matte 30 %, Patch 18 %, Puffy 14 %, Clear 12 %, Glitter 11 %, Holo 7 %, Prism 5 %, Gold 3 %.
+- **Binder:** nine pockets per page; tap (or Enter) to view a card large — shiny finishes glint as
+  the pointer moves; Escape closes it.
+- **Trade:** a card's trade code (`RF-XXXX-…`) passes its design to a friend, who pastes it in the
+  Trade tab. Your own Friend comes only from packs; other Friends only from trades; a book never
+  holds the same card twice.
+- **Battle (asynchronous PvP by codes):** pick five cards in order. Issue a challenge — you burn
+  one RF ticket and get a battle code (`RFB-…`) to send. Your friend pastes it, picks a deck, burns
+  one ticket, and watches the battle; they get a reply code to send back, and pasting it shows you
+  the same battle. Each round, cards trade blows (attack × element bonus − defence, a small random
+  spread and 10 % criticals) until one falls; best of five wins. Sun beats Moon, Moon beats Star,
+  Star beats Sun. Results are deterministic from both decks and the challenge nonce, so both sides
+  see identical battles. A challenge can be answered once and a reply counted once.
 
-In this preview the RF balance (20 simulated RF), purchases and draws come from the SDK's simulated
-ledger: no real RF moves. A live deployment would run the same buy → play → settle → redeem calls
-on-chain with wallet confirmations; that phase needs the Rare Friends team and is not part of this
-preview. Free packs never touch RF.
+## $RAREFRIENDS (RF)
 
-Trade codes carry a sticker design with a CRC-16 checksum against typos. They are not proofs of
-ownership, not signed and not scarce: a code can be shared with several people. Stickers and packs
-have no monetary value. Only RF packs use RF (simulated here).
-SDK v0.1.2 has no trading capability; real transfers would need a separately scoped integration.
+One consumable, the **RF ticket (2 RF)**, goes through the SDK chance game (`game.json`), with a
+host confirmation for each buy, draw and redemption:
 
-The book (up to 150 stickers) is saved locally for this browser and NFT session via the SDK's
-local preview storage. A failed save is shown and retried with the next change.
+- **RF pack:** one ticket → the SDK outcome picks the card: Rare (puffy/clear/glitter) 60 %,
+  Holo 30 %, Prism 7 %, Gold Foil 3 % with a 1 RF bonus that can be redeemed.
+- **Battle entry:** both players burn one ticket per battle. **No RF changes hands**: the winner
+  gets only the win in their record. There is no prize pool and no transfer between players.
+  Because the SDK has no pure burn call, an entry ticket is still drawn (play → settle) like any
+  ticket, so it carries the same 3 % chance of the 1 RF gold bonus; the screen says so. A half-opened
+  RF pack is never spent as a battle entry.
+
+Expected return is 0.03 RF per 2 RF ticket (≈ 98.5 % of RF stays spent). A ticket drawn but not
+yet revealed is resumed by its play id. The binder and battle screens show RF spent and RF burned.
+
+In this preview the RF balance (20 simulated RF), purchases, draws and burns come from the SDK's
+simulated ledger: no real RF moves. Live, the same buy → play → settle calls would run on-chain
+with wallet confirmations; RF paid for tickets goes to the game contract, so a true burn (sending
+entry fees to an unrecoverable address) needs a contract-side change agreed with the Rare Friends
+team. That phase is not part of this preview.
+
+Known limits of code-based battles: the responder receives the challenger's ordered deck before
+choosing their own, so a determined responder could pre-compute a favourable order (a commit–reveal
+exchange would fix this at the cost of a third message). At most ten challenges can wait for
+replies; a new one cannot be issued until some are settled.
+
+Trade and battle codes carry card designs and decks with a CRC-16 checksum against typos. They are
+not signed and not proofs of ownership; battles are friendly matches. Cards and records have no
+monetary value. SDK v0.1.2 has no trading or matchmaking capability; real-time PvP, verified decks
+and on-chain burns would need separately scoped integrations.
+
+The binder (up to 150 cards, the record, open challenges and answered-challenge keys) is saved
+locally for this browser and NFT session. An unreadable save stops the game rather than being
+overwritten.
 
 ## Development and verification
 
@@ -50,18 +73,17 @@ npm run build
 node scripts/dev-game.mjs dev games/rare-stickers
 node node_modules/typescript/bin/tsc -p games/rare-stickers/tsconfig.json
 node scripts/dev-game.mjs check games/rare-stickers
-node --test --experimental-test-coverage games/rare-stickers/album.test.mjs
+node --test --experimental-test-coverage games/rare-stickers/album.test.mjs games/rare-stickers/cards.test.mjs
 node games/rare-stickers/browser.test.mjs
+node games/rare-stickers/genesis-browser.test.mjs
 node scripts/dev-game.mjs build games/rare-stickers --outdir release-stickers
 ```
 
-Browser tests use SDK-only wallet fixtures. Set STICKERS_CHROMIUM to a Chromium executable if
-the bundled Playwright browser is missing.
+Set STICKERS_CHROMIUM to a Chromium executable if the bundled Playwright browser is missing.
 
 ## Assets and scope
 
-Friend art is the canonical sprite read through the SDK readers. Every finish, backdrop, frame
-and name is drawn or generated by this component; no third-party sticker, character or brand
-assets or names are used. Reduced-motion preference turns off the pack animation and the animated
-glitter/foil. There is no audio. This is a developer-hosted preview, not an official Rare Friends
-production release.
+Friend art is the canonical sprite read through the SDK readers. Every finish, frame, backdrop,
+name and battle effect is drawn or generated by this component; no third-party card, sticker or
+brand assets or names are used. Reduced motion skips the pack and battle animations. There is no
+audio. This is a developer-hosted preview, not an official Rare Friends production release.
