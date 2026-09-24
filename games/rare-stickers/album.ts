@@ -142,7 +142,8 @@ const sameSticker = (a: Sticker, b: Sticker) => encodeCode(a) === encodeCode(b);
 /** Stick onto the last page, or start a new page once it holds PAGE_CAP stickers. */
 export function addSticker(album: Album, sticker: Sticker, source: Source, seed: number): Album {
   if (album.items.length >= MAX_ITEMS) throw new Error('Your sticker book is full.');
-  if (source === 'trade' && album.items.some(it => it.source === 'trade' && sameSticker(it.sticker, sticker))) throw new Error('You already have this traded sticker.');
+  // A trade code can never duplicate a sticker already in the book, whether it came from a pack or a trade.
+  if (source === 'trade' && album.items.some(it => sameSticker(it.sticker, sticker))) throw new Error('You already have this sticker.');
   const lastPage = album.items.reduce((max, it) => Math.max(max, it.page), 0);
   const onLast = album.items.filter(it => it.page === lastPage).length;
   const page = onLast >= PAGE_CAP ? lastPage + 1 : lastPage;

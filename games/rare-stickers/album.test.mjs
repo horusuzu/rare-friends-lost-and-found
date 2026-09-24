@@ -52,6 +52,7 @@ test('stickers land on pages, never twice from the same trade code, within limit
   a = addSticker(a, traded, 'trade', 99);
   assert.throws(() => addSticker(a, traded, 'trade', 100), /already/i);
   assert.equal(addSticker(a, openPack(me, 0), 'pack', 5).items.length, a.items.length + 1, 'duplicate pack pulls are allowed');
+  assert.throws(() => addSticker(a, openPack(me, 0), 'trade', 6), /already/i, 'a pack sticker cannot be copied in through its own trade code');
   let full = newAlbum('2026-09-24'); for (let i = 0; i < MAX_ITEMS; i++) full = addSticker(full, openPack(me, i), 'pack', i);
   assert.throws(() => addSticker(full, openPack(me, 999), 'pack', 1), /full/i);
   const moved = moveSticker(a, 0, 3, -2); assert.equal(moved.items[0].x, 1); assert.equal(moved.items[0].y, 0); assert.notEqual(a.items[0].x, 1);
