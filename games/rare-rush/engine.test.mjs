@@ -65,9 +65,9 @@ test('cresting fast launches the car into the air; diving keeps it on the rail; 
   // Perfect landing: velocity matches the slope.
   const lx = crest + 40, slope = trackSlope(lx,5), v = 40, ang = Math.atan(slope);
   const land = s => { for (let i=0;i<60&&!s.grounded;i++) s = step(s, up, 1/60); return s; };
-  const perfect = land({...onTrack(lx,0), grounded:false, y:trackHeight(lx,5)+.05, vx:v*Math.cos(ang-.08), vy:v*Math.sin(ang-.08)});
+  const perfect = land({...onTrack(lx,0), grounded:false, takeoffAt:-1, y:trackHeight(lx,5)+.05, vx:v*Math.cos(ang-.08), vy:v*Math.sin(ang-.08)});
   assert.equal(perfect.grounded,true); assert.equal(perfect.event.kind,'perfect'); assert.ok(perfect.speed > v); assert.equal(perfect.perfects,1);
-  const bad = land({...onTrack(lx,0), grounded:false, y:trackHeight(lx,5)+.05, vx:10, vy:-40});
+  const bad = land({...onTrack(lx,0), grounded:false, takeoffAt:-1, y:trackHeight(lx,5)+.05, vx:3, vy:-50});
   assert.equal(bad.grounded,true); assert.equal(bad.event.kind,'bad'); assert.ok(bad.speed < 25);
 });
 
@@ -106,4 +106,21 @@ test('a long autoplay run stays finite, moves forward and scores', () => {
   assert.ok([s.x,s.y,s.vx,s.vy,s.speed,s.score].every(Number.isFinite));
   assert.ok(s.distance > 800, `distance ${s.distance}`); assert.ok(s.score > 0);
   assert.ok(s.y >= trackHeight(s.x,7) - .01);
+});
+
+test('a hop of a few milliseconds is not graded: no bonus, no toast, no penalty', () => {
+  const crest = trackPoints(6,5).find((p,i)=>i>0 && p.y>20).x, lx = crest + 40, ang = Math.atan(trackSlope(lx,5));
+  const hop = {...onTrack(lx,0), grounded:false, airTime:3, takeoffAt:3, y:trackHeight(lx,5)+.01, vx:40*Math.cos(ang-.05), vy:40*Math.sin(ang-.05)};
+  let s = hop; for (let i=0;i<10&&!s.grounded;i++) s = step(s, up, 1/60);
+  assert.equal(s.grounded,true); assert.equal(s.perfects,0); assert.equal(s.event,null); assert.ok(Math.abs(s.speed-40) < 3);
+  // Holding over every crest must not farm perfect landings.
+  let h = launch(createGame(7), 1.2);
+  for (let i=0;i<60*40 && h.status==='running';i++) h = step(h, down, 1/60);
+  assert.ok(h.perfects <= 3, `hold-everywhere perfects ${h.perfects}`);
+});
+
+test('boost gates in the air respect the speed cap', () => {
+  const gate = ringsBetween(0, 3000, 5).find(r=>r.kind==='gate');
+  const s = step({...onTrack(gate.x-.1,0), grounded:false, x:gate.x-.1, y:gate.y, vx:MAX_SPEED, vy:0, takeoffAt:-1}, up, 1/120);
+  assert.ok(Math.hypot(s.vx,s.vy) <= MAX_SPEED + 1e-9); assert.ok(s.maxSpeed <= MAX_SPEED + 1e-9);
 });

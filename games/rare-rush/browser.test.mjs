@@ -1,0 +1,39 @@
+import {chromium} from 'playwright';import assert from 'node:assert/strict';import {testGame} from '@rarefriends/friendsdk/testing';
+const launch=chromium.launch.bind(chromium);if(process.env.RUSH_CHROMIUM)chromium.launch=o=>launch({...o,executablePath:process.env.RUSH_CHROMIUM});
+const sizes=process.env.RUSH_SIZE?JSON.parse(process.env.RUSH_SIZE):[[320,568],[390,844],[844,390],[960,640],[1100,900]];
+for(const [width,height] of sizes)console.log(await testGame('./games/rare-rush',{width,height,screenshot:`./artifacts/rush-${width}.png`,check:async({page,game})=>{
+ await page.clock.install();await page.reload();await page.getByRole('button',{name:/^Connect (wallet|Browser wallet)$/}).click();await page.getByRole('button',{name:/^Friend #7730/}).click();
+ await game.getByRole('button',{name:'乗車する',exact:true}).waitFor();if(width===390||width===1100)await page.screenshot({path:`./artifacts/rush-start-${width}.png`});
+ await game.getByRole('button',{name:'乗車する',exact:true}).click();
+ const hold=game.getByRole('button',{name:'長押し',exact:true});const hb=await hold.boundingBox();const wallet=await page.getByRole('button',{name:'Open Friend wallet',exact:true}).boundingBox();
+ assert.ok(hb.y+hb.height<=wallet.y+1,'game controls must not overlap host controls');assert.ok(wallet.y+wallet.height<=height,'host controls within screen');assert.ok(hb.height>=44);
+ // Launch: hold to the pressure peak, then release.
+ const pressure=async()=>Number((await game.getByTestId('pressure').getAttribute('style')).match(/height:\s*([\d.]+)%/)[1]);
+ await hold.hover();await page.mouse.down();let seen=[];
+ for(let i=0;i<200;i++){await page.clock.runFor(30);const p=await pressure();seen.push(p);if(p>=92)break;}
+ assert.ok(seen.some(p=>p>5&&p<92),'pressure builds gradually');assert.ok(seen.at(-1)>=92,`reached the peak: ${seen.at(-1)}`);
+ if(width===390)await page.screenshot({path:'./artifacts/rush-launch-390.png'});await page.mouse.up();await page.clock.runFor(300);
+ assert.ok(Number(await game.getByTestId('speed').innerText())>=180,'perfect launch reaches 180+ km/h');
+ // Ride with holds and releases; distance grows.
+ for(let i=0;i<6;i++){await hold.hover();await page.mouse.down();await page.clock.runFor(700);await page.mouse.up();await page.clock.runFor(500);}
+ const dist=Number((await game.getByTestId('distance').innerText()).replace('m',''));assert.ok(dist>150,`distance ${dist}`);
+ if(width===390||width===1100)await page.screenshot({path:`./artifacts/rush-ride-${width}.png`});
+ await game.getByRole('button',{name:'一時停止',exact:true}).click();await game.getByRole('heading',{name:'PAUSED',exact:true}).waitFor();
+ await page.clock.runFor(300);const frozen=await game.getByTestId('distance').innerText();await page.clock.runFor(2000);assert.equal(await game.getByTestId('distance').innerText(),frozen,'pause freezes the ride');
+ await game.getByRole('button',{name:'再開する',exact:true}).click();
+ await game.getByRole('button',{name:'効果音',exact:true}).click();assert.equal(await game.getByRole('button',{name:'効果音',exact:true}).getAttribute('aria-pressed'),'false');
+ // Let the timer run out.
+ for(let i=0;i<60;i++){if(await game.getByRole('heading',{name:'おつかれさま！',exact:true}).count())break;await page.clock.runFor(5000);}
+ await page.screenshot({path:'./artifacts/rush-dbg-'+width+'.png'});await game.getByRole('heading',{name:'おつかれさま！',exact:true}).waitFor();
+ const finalScore=Number(await game.getByTestId('final-score').innerText());assert.ok(finalScore>0);
+ if(width===390)await page.screenshot({path:'./artifacts/rush-over-390.png'});
+ await game.getByRole('button',{name:'スコアをXでシェア',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'スコアをシェア',exact:true});await dialog.waitFor();if(width===390||width===1100)await page.screenshot({path:`./artifacts/rush-share-${width}.png`});
+ const link=dialog.getByRole('link',{name:'Xの投稿画面を開く ↗'});const u=new URL(await link.getAttribute('href'));const text=u.searchParams.get('text');
+ assert.equal(u.origin,'https://x.com');assert.ok(text.includes(`RARE RUSHでFriend #7730と${finalScore}点`),text);assert.match(text,/最高\d+km\/h/);assert.equal(u.searchParams.get('url'),'https://horusuzu.github.io/rare-friends-lost-and-found/rush/');
+ await page.context().route('https://x.com/**',r=>r.fulfill({body:'Test composer; no post sent'}));const popup=page.waitForEvent('popup');await link.click();const opened=await popup;await opened.waitForLoadState();assert.equal(new URL(opened.url()).origin,'https://x.com');await opened.close();
+ await dialog.getByRole('button',{name:'ゲームに戻る'}).click();await game.getByRole('button',{name:'English',exact:true}).click();await game.getByRole('button',{name:'Ride again',exact:true}).click();
+ assert.equal(await game.getByTestId('score').innerText(),'0');
+ assert.equal(await game.locator('.rush').evaluate(e=>e.scrollWidth>e.clientWidth+1),false,'no horizontal overflow');
+ assert.equal(await game.locator('body').evaluate(e=>e.scrollWidth>innerWidth),false);
+}}));

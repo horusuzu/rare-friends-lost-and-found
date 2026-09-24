@@ -3,7 +3,9 @@ import {scoreGame} from './score-games.js';
 export type ScoreShare = readonly [score:number,wave:number,status:'over'|'won',language:'ja'|'en'];
 export function scoreIntent(result:ScoreShare,friendId:bigint,collection:string,gameName='Rare Invaders'){
  const [score,wave,status,lang]=result;const pilot=`${collection==='genesis'?'Genesis':'Friend'} #${friendId}`;const game=scoreGame(gameName);if(!game)throw new Error('Score sharing unavailable.');
- const text=game.copy==='tiers'
+ const text=game.copy==='speed'
+  ?(lang==='ja'?`${game.title}で${pilot}と${score}点！ 最高${wave}km/hで絶叫！\nあなたのFriendで挑戦してみて。`:`I scored ${score} with ${pilot} in ${game.title}! Top speed ${wave} km/h.\nYour Friend. Your turn.`)
+  :game.copy==='tiers'
   ?(lang==='ja'?`${game.title}で${pilot}と${score}点！ ${wave===game.maxWave?'最後の一粒で、Friendが生まれた！':`TIER ${wave}/${game.maxWave}`}\nあなたのFriendで挑戦してみて。`:`I scored ${score} with ${pilot} in ${game.title}! ${wave===game.maxWave?'Merged all the way to my Friend!':`Reached tier ${wave}/${game.maxWave}`}\nYour Friend. Your turn.`)
   :(lang==='ja'?`${game.title}で${pilot}と${score}点！ ${status==='won'?'全5ウェーブクリア！':`WAVE ${wave}/5`}\nあなたのFriendで挑戦してみて。`:`I scored ${score} with ${pilot} in ${game.title}! ${status==='won'?'All 5 waves cleared!':`Wave ${wave}/5`}\nYour Friend. Your turn.`);
  const url=new URL('https://x.com/intent/tweet');url.searchParams.set('text',text);url.searchParams.set('url',game.url);url.searchParams.set('hashtags','RareFriends,Vibeathon');return {text,url:url.href};

@@ -7,8 +7,8 @@ export const MIN_SPEED = 6;
 export const MAX_SPEED = 100;
 export const FUJI_HEIGHT = 79;
 const GRAVITY = 24, DIVE = 1.9, AIR_DIVE = 2.8, DRAG = 0.00055, SCREAM_PUSH = 5;
-const PERFECT_ANGLE = 0.22, BAD_ANGLE = 0.6, CATCH_RADIUS = 3.6, GATE_BOOST = 14;
-const SCREAM_TIME = 6, PRESSURE_RISE = 1.2, STEP = 1 / 120;
+const PERFECT_ANGLE = 0.35, BAD_ANGLE = 0.95, CATCH_RADIUS = 3.6, GATE_BOOST = 14;
+const SCREAM_TIME = 6, PRESSURE_RISE = 1.2, STEP = 1 / 120, MIN_FLIGHT = 0.25;
 
 export type EventKind = 'launch' | 'perfect-launch' | 'perfect' | 'bad' | 'boost' | 'checkpoint' | 'scream';
 export interface RushEvent { kind: EventKind; at: number }
@@ -18,6 +18,8 @@ export interface State {
   x: number; y: number; vx: number; vy: number; speed: number; grounded: boolean;
   held: boolean; heldFor: number; pressure: number;
   distance: number; score: number; sparks: number; perfects: number; maxSpeed: number; airTime: number;
+  /** airTime when the current flight began; landings shorter than MIN_FLIGHT are not graded. */
+  takeoffAt: number;
   scream: number; screamTime: number; nextCheckpoint: number; collected: number[];
   event: RushEvent | null;
 }
@@ -98,7 +100,7 @@ export function createGame(seed = 1): State {
   return {
     status: 'launch', seed: seed >>> 0, time: 0, timeLeft: START_TIME,
     x: 12, y: 0, vx: 0, vy: 0, speed: 0, grounded: true, held: false, heldFor: 0, pressure: 0,
-    distance: 0, score: 0, sparks: 0, perfects: 0, maxSpeed: 0, airTime: 0,
+    distance: 0, score: 0, sparks: 0, perfects: 0, maxSpeed: 0, airTime: 0, takeoffAt: 0,
     scream: 0, screamTime: 0, nextCheckpoint: CHECKPOINT_EVERY, collected: [], event: null,
   };
 }
@@ -128,7 +130,7 @@ function ride(s: State, hold: boolean, h: number): void {
   s.speed = clamp(s.speed + accel * h, MIN_SPEED, MAX_SPEED);
   const curve = trackCurve(s.x, s.seed) / Math.pow(1 + slope * slope, 1.5);
   if (curve < 0 && s.speed * s.speed * -curve > GRAVITY * weight * Math.cos(angle)) {
-    s.grounded = false; s.vx = s.speed * Math.cos(angle); s.vy = s.speed * Math.sin(angle);
+    s.grounded = false; s.takeoffAt = s.airTime; s.vx = s.speed * Math.cos(angle); s.vy = s.speed * Math.sin(angle);
     return;
   }
   s.x += s.speed * Math.cos(angle) * h;
@@ -147,11 +149,13 @@ function fly(s: State, hold: boolean, h: number): void {
   const tangent = Math.atan(trackSlope(s.x, s.seed)), heading = Math.atan2(s.vy, s.vx);
   const miss = Math.abs(heading - tangent), along = Math.hypot(s.vx, s.vy) * Math.cos(miss);
   s.y = ground; s.grounded = true;
-  if (miss < PERFECT_ANGLE) {
+  // Skimming a crest for a few substeps is riding, not a jump: no grade either way.
+  if (s.airTime - s.takeoffAt < MIN_FLIGHT) s.speed = clamp(along, MIN_SPEED, MAX_SPEED);
+  else if (miss < PERFECT_ANGLE) {
     s.speed = clamp(along * 1.12, MIN_SPEED, MAX_SPEED); s.perfects += 1; s.scream += 0.22;
     s.score += 100 * multiplier(s); emit(s, 'perfect');
   } else if (miss > BAD_ANGLE) {
-    s.speed = clamp(along * 0.55, MIN_SPEED, MAX_SPEED); emit(s, 'bad');
+    s.speed = clamp(along * 0.75, MIN_SPEED, MAX_SPEED); emit(s, 'bad');
   } else s.speed = clamp(along, MIN_SPEED, MAX_SPEED);
 }
 
@@ -162,7 +166,11 @@ function collect(s: State): void {
     collected.add(ring.id);
     if (ring.kind === 'spark') { s.sparks += 1; s.score += 10 * multiplier(s); continue; }
     s.speed = clamp(s.speed + GATE_BOOST, MIN_SPEED, MAX_SPEED);
-    if (!s.grounded) s.vx += GATE_BOOST;
+    if (!s.grounded) {
+      s.vx += GATE_BOOST;
+      const air = Math.hypot(s.vx, s.vy);
+      if (air > MAX_SPEED) { s.vx *= MAX_SPEED / air; s.vy *= MAX_SPEED / air; }
+    }
     s.score += 50 * multiplier(s); emit(s, 'boost');
   }
   // Rings are only reachable near the car, so a short recent list is enough.

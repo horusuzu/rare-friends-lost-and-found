@@ -21,3 +21,13 @@ test('Rare Drop shares its own URL, title and largest Friend tier up to eleven',
  assert.match(ja.text,/RARE DROP/);assert.match(ja.text,/Friend #7730/);assert.match(ja.text,/4200/);assert.match(ja.text,/Friend/);
  assert.match(en.text,/Genesis #597/);assert.match(en.text,/tier 4\/11/i);assert.doesNotMatch(en.text,/INVADERS|Wave/);
 });
+test('Rare Rush shares top speed in km/h with its own fixed URL',async()=>{
+ const definition={name:'Rare Rush',consumable:'unused',price:1n,outcomes:[{name:'unused',chanceBps:10000,reward:1n}]};const {port1,port2}=new MessageChannel();let received;
+ const host=bindGameFrame(port1,{client:createGamePreview(definition,{friendId:7730n,stake:1n,rfBalance:0n}).client,authorize:async()=>{throw Error('No transactions');},onShareScore:args=>{received=args;}});const frame=createFrameGameClient(port2,definition);
+ try{await frame.client.shareScore(15000,360,'over','ja');assert.deepEqual(received,[15000,360,'over','ja']);await assert.rejects(frame.client.shareScore(10,361,'over','en'),/Unsupported/);}finally{host.close();frame.close();}
+ const {scoreIntent}=await import('../dist/score-share.js');
+ const ja=scoreIntent([15000,312,'over','ja'],7730n,'generations','Rare Rush'),en=scoreIntent([900,180,'over','en'],597n,'genesis','Rare Rush');
+ for(const {url} of [ja,en])assert.equal(new URL(url).searchParams.get('url'),'https://horusuzu.github.io/rare-friends-lost-and-found/rush/');
+ assert.match(ja.text,/RARE RUSH/);assert.match(ja.text,/Friend #7730/);assert.match(ja.text,/15000/);assert.match(ja.text,/312km\/h/);
+ assert.match(en.text,/Genesis #597/);assert.match(en.text,/180 km\/h/);assert.doesNotMatch(en.text,/Wave|tier/i);
+});
