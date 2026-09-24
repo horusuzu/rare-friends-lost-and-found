@@ -84,7 +84,7 @@ function takeSpot(r: Rng, spots: Point[], taken: Set<string>): Point | null {
   return p;
 }
 
-export const spawnDelay = (r: Rng): number => r.range(35, 60);
+export const spawnDelay = (r: Rng): number => r.range(30, 52);
 
 function populate(r: Rng, map: FloorMap, floor: number, firstId: number) {
   const [sx, sy] = map.start, [tx, ty] = map.stairs;
@@ -92,7 +92,7 @@ function populate(r: Rng, map: FloorMap, floor: number, firstId: number) {
   const monTaken = new Set([`${sx},${sy}`]);
   const monSpots = roomSpots(map, startRoom, monTaken);
   const mons: Mon[] = [];
-  const count = r.range(2, 3) + Math.floor(floor * 0.6);
+  const count = r.range(2, 4) + Math.floor(floor * 0.65);
   for (let i = 0; i < count; i++) {
     const p = takeSpot(r, monSpots, monTaken); if (!p) break;
     const sp = pickSpecies(r, floor), m = makeMon(sp, p[0], p[1], firstId + i);

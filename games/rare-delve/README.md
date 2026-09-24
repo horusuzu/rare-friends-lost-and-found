@@ -62,8 +62,8 @@ the same floor. Rooms light up whole when you enter them; in corridors you see o
 Explored tiles stay on the map (dimmed when out of sight); monsters show only while seen. A corner
 minimap and a full-screen map show rooms, corridors, stairs, items and visible monsters.
 
-- Monsters per floor: `2–3 + ⌊floor × 0.6⌋`, about half asleep at first. A new one wanders in out
-  of sight every 35–60 turns (at most 18 on a floor).
+- Monsters per floor: `2–4 + ⌊floor × 0.65⌋`, about half asleep at first. A new one wanders in out
+  of sight every 30–52 turns (at most 18 on a floor).
 - Items: 4–6 per floor (one more from floor 5), plus 1–3 piles of gold worth `(8–24) × (floor + 2)`.
 - Traps: `min(6, 1 + ⌊floor / 2⌋ + 0–1)`, hidden until stepped on or found by waiting next to them,
   never beside a doorway. Floor 10 holds the Heart Lantern on its pedestal and has no pitfalls.
@@ -111,11 +111,21 @@ known. A kind becomes known when you drink or read it, when a wand hits somethin
 Drowse or Muddle Draught takes effect, or with a **Scroll of Insight**. Kinds you carry down from
 town are known from the start. Knowledge lasts for the dive.
 
+## Balance
+
+Difficulty is tuned with two scripted players over 40 seeded first dives (no shop upgrades):
+`bot.mjs` fights and explores but never aims items; `bot-skilled.mjs` also throws darts and potions,
+zaps wands at dangerous monsters, burns crowds and test-drinks unknown bottles. The skilled player
+clears roughly one first dive in six to eight, a few dives end on floors 1–3, and most deaths come
+from floor 5 on (Thorn Wasps, Gulp Toads, Twig Archers, Muddle Bats, Magma Tortoises). Hunger rarely
+kills but punishes clearing every room. `engine-bot.test.mjs` keeps these bands; `node
+games/rare-delve/balance-sim.mjs 60` prints a fuller report.
+
 ## Hunger, regeneration and traps
 
-- The belly starts at 100 % and drops 1 % every 10 turns. Warnings appear at 20 % and 10 %; at 0 %
+- The belly starts at 100 % and drops 1 % every 9 turns. Warnings appear at 20 % and 10 %; at 0 %
   you lose 1 HP per turn instead. A Small Bun fills 50 %, a Big Loaf fills completely.
-- While fed and hurt you regenerate: each turn max HP is added to a pool, and every 110 points heal
+- While fed and hurt you regenerate: each turn max HP is added to a pool, and every 150 points heal
   1 HP (at most 1 HP per turn).
 - **Trip Snare** drops a random bag item nearby; **Pitfall** drops you to the next floor for 5
   damage (never below 1 HP); **Clapper Trap** wakes every monster on the floor. Waiting searches the

@@ -9,7 +9,7 @@ export const BAG_MAX = 20;
 export const CHEST_MAX = 8;
 export const FULL_MAX = 100;
 /** The belly drops 1 % every this many turns. */
-export const HUNGER_TURNS = 10;
+export const HUNGER_TURNS = 9;
 export const BASE_HP = 25;
 export const HP_PER_LEVEL = 5;
 export const BASE_STR = 8;
@@ -22,7 +22,7 @@ export const GOLD_CAP = 999_999;
 export const SHOP_COSTS: readonly number[] = [0, 0, 400, 1200];
 export const SHOP_MAX = 3;
 /** Regeneration: the hero gains 1 HP each time this many "max HP points" accumulate. */
-export const REGEN_POOL = 110;
+export const REGEN_POOL = 150;
 
 export type Dir = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
 export const DIR_LIST: readonly Dir[] = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
@@ -54,9 +54,9 @@ const item = (kind: ItemKind, name: Text, note: Text, price: number, power: numb
   ({ kind, name, note, price, power, weight, minFloor });
 
 export const ITEMS: Readonly<Record<string, ItemDef>> = {
-  bun: item('food', t('小さなパン', 'Small Bun'), t('おなかが 50% ふくれる。', 'Fills the belly by 50%.'), 10, 50, 100),
+  bun: item('food', t('小さなパン', 'Small Bun'), t('おなかが 50% ふくれる。', 'Fills the belly by 50%.'), 10, 50, 75),
   loaf: item('food', t('大きなパン', 'Big Loaf'), t('おなかが いっぱいになる。', 'Fills the belly completely.'), 30, 100, 40, 2),
-  mendleaf: item('herb', t('いやしの葉', 'Mendleaf'), t('HPが 25 回復。満タンなら 最大HP+1。', 'Heals 25 HP; at full HP, max HP +1.'), 20, 25, 85),
+  mendleaf: item('herb', t('いやしの葉', 'Mendleaf'), t('HPが 25 回復。満タンなら 最大HP+1。', 'Heals 25 HP; at full HP, max HP +1.'), 20, 25, 70),
   clearroot: item('herb', t('すっきり根', 'Clearroot'), t('ちからを もどし、混乱を なおす。', 'Restores strength and clears confusion.'), 25, 0, 30, 2),
   sprout: item('herb', t('ふんばり芽', 'Grit Sprout'), t('ちからの 上限が 1 あがる。', 'Raises strength and its cap by 1.'), 150, 1, 14, 2),
   p_mend: item('potion', t('なおりの薬', 'Mending Draught'), t('HP全快、最大HP+3。', 'Full heal and max HP +3.'), 80, 3, 26),
@@ -118,18 +118,18 @@ const sp = (name: Text, note: Text, hp: number, atk: number, def: number, exp: n
   ({ name, note, hp, atk, def, exp, minFloor, maxFloor, speed, quirk, weight });
 
 export const SPECIES: Readonly<Record<string, SpeciesDef>> = {
-  dustbun: sp(t('ほこりん', 'Dustbun'), t('ふらふら 動く ほこりの かたまり。', 'A wobbly dust ball that drifts at random.'), 7, 2, 1, 3, 1, 3, 'normal', 'erratic', 12),
-  newt: sp(t('ねぼけイモリ', 'Drowsy Newt'), t('おこされるまで ねむっている。', 'Sleeps until something wakes it.'), 11, 3, 2, 5, 1, 4, 'normal', 'sleeper', 12),
-  crab: sp(t('こいしガニ', 'Pebble Crab'), t('かたいが 動きが おそい。', 'Hard shell, slow feet.'), 15, 5, 7, 8, 2, 5, 'slow', 'armored'),
-  moth: sp(t('ひかりガ', 'Glimmoth'), t('1ターンに 2回 動く。', 'Moves twice every turn.'), 10, 4, 2, 9, 3, 6, 'fast', 'fast'),
-  mite: sp(t('コインダニ', 'Coin Mite'), t('ゴールドを ぬすんで ワープする。', 'Steals gold and warps away.'), 13, 4, 3, 10, 2, 7, 'normal', 'thief', 8),
-  slug: sp(t('さびナメクジ', 'Rust Slug'), t('さわると 盾が さびて 弱くなる。', 'Its touch rusts your shield.'), 22, 7, 4, 14, 4, 8, 'normal', 'rust'),
-  archer: sp(t('えだゆみ', 'Twig Archer'), t('まっすぐ ならぶと 矢を うつ。', 'Shoots arrows along straight lines.'), 17, 6, 3, 16, 4, 9, 'normal', 'archer'),
-  jelly: sp(t('ふえるゼリー', 'Twin Jelly'), t('たたくと ふえることが ある。', 'May split in two when struck.'), 20, 7, 3, 12, 5, 9, 'normal', 'split', 8),
-  toad: sp(t('まるのみガエル', 'Gulp Toad'), t('床の 道具を のみこむ。', 'Swallows items lying on the floor.'), 30, 10, 5, 22, 5, 10, 'normal', 'gulp'),
-  wasp: sp(t('トゲバチ', 'Thorn Wasp'), t('さされると ちからが へる。', 'Its sting saps your strength.'), 26, 11, 5, 26, 6, 10, 'normal', 'sting'),
-  bat: sp(t('まどいコウモリ', 'Muddle Bat'), t('ふらふら とび、かむと 混乱させる。', 'Flits about; its bite confuses.'), 28, 12, 6, 32, 7, 10, 'normal', 'muddle'),
-  tortoise: sp(t('ようがんガメ', 'Magma Tortoise'), t('おそいが 一撃が 重い。', 'Slow, but hits like a landslide.'), 60, 17, 12, 60, 8, 10, 'slow', 'heavy', 8),
+  dustbun: sp(t('ほこりん', 'Dustbun'), t('ふらふら 動く ほこりの かたまり。', 'A wobbly dust ball that drifts at random.'), 8, 3, 1, 3, 1, 3, 'normal', 'erratic', 12),
+  newt: sp(t('ねぼけイモリ', 'Drowsy Newt'), t('おこされるまで ねむっている。', 'Sleeps until something wakes it.'), 12, 3, 2, 5, 1, 4, 'normal', 'sleeper', 12),
+  crab: sp(t('こいしガニ', 'Pebble Crab'), t('かたいが 動きが おそい。', 'Hard shell, slow feet.'), 16, 5, 7, 8, 2, 5, 'slow', 'armored'),
+  moth: sp(t('ひかりガ', 'Glimmoth'), t('1ターンに 2回 動く。', 'Moves twice every turn.'), 11, 4, 2, 9, 3, 6, 'fast', 'fast'),
+  mite: sp(t('コインダニ', 'Coin Mite'), t('ゴールドを ぬすんで ワープする。', 'Steals gold and warps away.'), 14, 4, 3, 10, 2, 7, 'normal', 'thief', 8),
+  slug: sp(t('さびナメクジ', 'Rust Slug'), t('さわると 盾が さびて 弱くなる。', 'Its touch rusts your shield.'), 23, 8, 4, 14, 4, 8, 'normal', 'rust'),
+  archer: sp(t('えだゆみ', 'Twig Archer'), t('まっすぐ ならぶと 矢を うつ。', 'Shoots arrows along straight lines.'), 17, 7, 3, 16, 4, 9, 'normal', 'archer'),
+  jelly: sp(t('ふえるゼリー', 'Twin Jelly'), t('たたくと ふえることが ある。', 'May split in two when struck.'), 21, 7, 3, 12, 5, 9, 'normal', 'split', 8),
+  toad: sp(t('まるのみガエル', 'Gulp Toad'), t('床の 道具を のみこむ。', 'Swallows items lying on the floor.'), 32, 11, 5, 22, 5, 10, 'normal', 'gulp'),
+  wasp: sp(t('トゲバチ', 'Thorn Wasp'), t('さされると ちからが へる。', 'Its sting saps your strength.'), 28, 12, 5, 26, 6, 10, 'normal', 'sting'),
+  bat: sp(t('まどいコウモリ', 'Muddle Bat'), t('ふらふら とび、かむと 混乱させる。', 'Flits about; its bite confuses.'), 30, 13, 6, 32, 7, 10, 'normal', 'muddle'),
+  tortoise: sp(t('ようがんガメ', 'Magma Tortoise'), t('おそいが 一撃が 重い。', 'Slow, but hits like a landslide.'), 62, 18, 12, 60, 8, 10, 'slow', 'heavy', 8),
 };
 
 export type TrapKind = 'trip' | 'pit' | 'alarm';
