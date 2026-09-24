@@ -258,7 +258,7 @@ function Quest({ friendId, collection = 'generations', client, paused }: GameCom
     </header>
     <div className="stage">
       <div className="screen" data-testid="screen" data-scene={scene?.k ?? 'title'} data-ui={battleUi} data-map={s?.map ?? ''} data-x={s?.x ?? ''} data-y={s?.y ?? ''}
-        data-last={s?.last ?? ''} data-party={s?.party.length ?? 0} data-types={partyTypes.join(',')}>
+        data-last={s?.last ?? ''} data-paused={String(!active)} data-party={s?.party.length ?? 0} data-types={partyTypes.join(',')}>
         <canvas ref={canvas} width={SCREEN_W} height={SCREEN_H} aria-label={tt('ゲーム画面', 'Game screen')} role="img" />
         {started && renderOverlay()}
         {(!started || error) && <div className="title">

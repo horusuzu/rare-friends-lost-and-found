@@ -54,15 +54,16 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-qu
     // Pace the tall grass until a wild monster appears (retry if a battle is lost).
     let result = '';
     for (let battle = 0; battle < 3 && !['win', 'caught'].includes(result); battle++) {
-      let dir = 'up';
+      let dir = 'up'; const trail = [];
       for (let n = 0; n < 150 && await attr('scene') === 'world'; n++) {
-        if (await attr('map') !== 'wakaba') break;
+        if (await attr('map') === 'moegi') { await hold('up', async () => await attr('map') === 'wakaba' || await attr('scene') !== 'world'); continue; }
         const y = Number(await attr('y'));
-        dir = y <= 21 ? 'down' : y >= 23 ? 'up' : dir;
-        const target = dir === 'up' ? y - 1 : y + 1;
+        // Grass rows 21-23 at x=9; overshooting north is harmless, south leads back to the village.
+        dir = y <= 20 ? 'down' : y >= 22 ? 'up' : dir;
+        const target = dir === 'up' ? y - 1 : y + 1; trail.push(`${y}${dir[0]}${await attr('paused') === 'true' ? 'P' : ''}`);
         await hold(dir, async () => Number(await attr('y')) === target || await attr('scene') !== 'world', 3000).catch(() => {});
       }
-      await until('battle', async () => await attr('scene') === 'battle');
+      await until(`battle after ${trail.join(' ')} on ${await attr('map')}`, async () => await attr('scene') === 'battle', 5000);
       if (battle === 0) {
         await until('battle menu', async () => { if (await attr('ui') === 'main') return true; await tapA(); return false; });
         await game.getByRole('button', { name: 'たたかう', exact: true }).waitFor();
