@@ -24,6 +24,18 @@ const validId = (value: unknown): value is bigint => typeof value === "bigint" &
 const MAX_TRANSFER_LOGS = 100_000;
 const MAX_OWNED_FRIENDS = 10_000;
 
+/** Raised when Friend discovery does not finish in time, so the picker can offer a retry. */
+export class FriendDiscoveryTimeoutError extends Error {
+  constructor() { super("Loading your Friends took too long. Check your connection, then retry."); this.name = "FriendDiscoveryTimeoutError"; }
+}
+
+/** Rejects with FriendDiscoveryTimeoutError when a discovery read stalls longer than `ms`. */
+export function withDiscoveryDeadline<T>(request: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new FriendDiscoveryTimeoutError()), ms); });
+  return Promise.race([request, deadline]).finally(() => clearTimeout(timer));
+}
+
 /**
  * Read-only discovery using two indexed, owner-filtered Transfer queries. The
  * canonical Generations contract has no ERC721Enumerable owner enumeration.
