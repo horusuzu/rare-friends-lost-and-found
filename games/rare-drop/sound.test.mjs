@@ -77,7 +77,7 @@ test('pause or a hidden page silences everything until released', () => {
 test('simultaneous voices are capped and repeated landings are rate-limited', () => {
   const audio = fakeAudio(), sfx = createDropSound({createContext: audio.createContext});
   sfx.unlock();
-  for (let i = 0; i < 30; i++) sfx.play('merge', {pitch: 1 + i / 30});
+  for (let i = 0; i < 30; i++) assert.equal(sfx.play('big', {pitch: 1 + i / 30}), true);
   assert.ok(sfx.voices <= MAX_VOICES, `voices ${sfx.voices}`);
   assert.ok(MAX_VOICES >= 3 && MAX_VOICES <= 8);
   sfx.stopAll(); assert.equal(sfx.voices, 0);
