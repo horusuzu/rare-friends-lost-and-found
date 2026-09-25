@@ -208,6 +208,32 @@ A real bet on accrued rewards would need what SDK v0.1.2 does not provide:
   Activity category measures;
 - the streak bonus would then be real winnings held by the contract until withdrawn or re-staked.
 
+## Bet effects (pachinko-style reach, jackpot and burn)
+
+Presentation only: the engine fixes the result at confirmation, and `reach.ts` receives that result as an input and
+plans the show deterministically from the bet seed. Nothing here can draw, change or delay an outcome, and the odds
+shown before staking (45 %, ×2, loss burns) never change.
+
+- **Reach (リーチ).** The mine dims, spotlights sweep and a three-reel window (coin, gem, your Friend) spins. The
+  first two reels stop matching at 0.6 s and 1.05 s, 「リーチ！」 is called at 1.1 s with a rising siren, an
+  accelerating heartbeat and a flashing border, and the last reel crawls home. Some reaches escalate to
+  「激アツ！」 (1.7 s) or 「超激アツ」 (2.3 s, three spotlights and rainbow colour). Like a pachinko 信頼度, the hotter tiers
+  are more common before a win (win: 50 / 35 / 15 %, loss: 82 / 15 / 3 %), but the result was already fixed. 35 % of
+  reaches hang on a near miss before the last reel settles. Total 2.6–3.95 s; tap to skip.
+- **Win (大当たり).** The reels lock, one white flash, then rotating gold light rays, confetti and sparkles, a
+  「大当たり！ ×2」 banner with a shine sweep, and a coin torrent that really fills the cart while the pot rolls up.
+  Streaks escalate: ×4 「連チャン！」, ×8 「確変突入！」 with a rainbow wash, ×16 and up **FEVER** with expanding rings.
+  Sound: a sub-bass hit, a flash zap, a three-phrase square/saw fanfare (original melody, transposed up each tier),
+  a bell cascade, a 2–3 s 「ジャラジャラ」 pour of streamed coin clinks, and from 確変 a driving fever loop that climbs a
+  semitone a bar. On screen 3.0–4.5 s.
+- **Lose (バーン).** The last reel slides off with a clunk, a beat of silence, one dim orange flash and a short
+  shake, then the cart bursts into flame with rising embers, charred coin crumbs and smoke, under 「🔥 N バーン」.
+  Sound: a deep boom and whoosh, a descending wah-wah brass, coin clatter and crackling embers. On screen 2.2 s.
+- **Safety and comfort.** Each celebration has at most one full flash (no strobing and no red flashes), particles
+  are capped, and everything is canvas or CSS transform/opacity. With reduced motion the reach is a 0.3 s static
+  reveal and the win/lose cards are still (1.8 s) with no flash or shake. ♪ / M mute everything including the fever
+  loop, and pause, page hide, unmount or a new bet stop the show at once.
+
 ## Sound
 
 Synthesised with WebAudio only; no audio files. In real mode each popping coin lands with a clink,
