@@ -1,0 +1,14 @@
+{
+  "name": "Rare Mine",
+  "consumable": "Unused placeholder; the bet is a local simulated preview",
+  "price": "1",
+  "outcomes": [
+    {
+      "name": "Unused; no token payout",
+      "chanceBps": 10000,
+      "reward": "1"
+    }
+  ],
+  "linkedGenesisId": "597",
+  "allowGenesisPreview": true
+}
