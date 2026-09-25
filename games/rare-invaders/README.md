@@ -16,11 +16,27 @@ transaction or signature. Choose Japanese or English, then launch.
 - Pause: P, Escape or the pause button. Losing focus pauses play.
 - Clear five waves with three lives. An enemy reaching your line ends the run.
 - Best score is stored locally per SDK session identity. Storage failures do not block play.
+- Sound: the ♪ button or M turns sound effects on and off (see below).
 
 No entry fee, purchases, RF rewards or redemption promises. Scores have no monetary
 value. The required game.json chance-game schema is unused by this arcade mode;
 no purchase, play or settlement action is called. The SDK host uses local preview
-mode. There is no audio. Reduced-motion preference disables moving star effects.
+mode. Reduced-motion preference disables moving star effects.
+
+## Sound
+
+Short synthesised WebAudio cues (oscillators and filtered noise; no audio files): shot, enemy hit
+and explosion, player hit, shield, wave clear, game over, sector clear and a new best. The engine
+stays pure; `soundsFor(previous, next)` in `sound.ts` reads what changed between two frames.
+
+- **♪ button** next to the language switch (accessible name 効果音 / Sound effects, `aria-pressed`
+  shows the state), or **M** (not used by play controls).
+- The setting is saved with the best score (`{"version":1,"best":…,"sound":…}`). Saves from before
+  the setting load with sound on; an unreadable sound value keeps the best score and plays sound.
+  The switch waits while the host menu is open, because the host refuses saves then.
+- The AudioContext is created on the first tap or key press; nothing plays while paused (P, Escape,
+  the pause button, the host menu or lost focus) or while the page is hidden. At most six cues play
+  at once, so rapid fire never piles up; each tone has a soft attack and release.
 
 ## Development and verification
 
@@ -30,7 +46,7 @@ From the repository root with dependencies installed:
 node scripts/dev-game.mjs dev games/rare-invaders
 node node_modules/typescript/bin/tsc -p games/rare-invaders/tsconfig.json
 node scripts/dev-game.mjs check games/rare-invaders
-node --test games/rare-invaders/engine.test.mjs
+node --test games/rare-invaders/engine.test.mjs games/rare-invaders/sound.test.mjs
 node games/rare-invaders/browser.test.mjs
 node scripts/dev-game.mjs build games/rare-invaders --outdir release-invaders
 ```
@@ -38,7 +54,9 @@ node scripts/dev-game.mjs build games/rare-invaders --outdir release-invaders
 Browser tests use SDK-only wallet fixtures, never shipped with the playable build.
 Optionally set INVADERS_CHROMIUM to an installed Chromium/Chrome executable.
 They exercise launch, firing and score changes, shield cooldown, pause/resume,
-wallet overlay pause preservation and narrow-screen overflow at 390px and 1100px.
+wallet overlay pause preservation, the ♪ toggle (click, M, saved across a reload, 44px and clear of
+the header controls) and narrow-screen overflow at 390px and 1100px. Set INVADERS_SIZE (for example
+`[[320,568]]`) to run one viewport per process.
 
 ## Assets and scope
 

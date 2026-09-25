@@ -2,6 +2,8 @@ import {useEffect,useRef,useState} from 'react';
 import type {GameComponentProps} from '@rarefriends/friendsdk/runtime';
 import {createFriendReader,createGenesisReader,type GenerationSprites} from '@rarefriends/friendsdk/sprites';
 import {createGame,step,WIDTH,HEIGHT,PLAYER_Y,type State} from './engine.js';
+import {CUES,createSound,soundsFor} from './sound.js';
+import {parseSave,serializeSave} from './save.js';
 import './style.css';
 const foes=['01100110/11111111/10111101/11111111/00111100/01011010/10000001','00111100/01111110/11011011/11111111/00100100/01011010/10000001','00011000/01111110/11011011/11111111/10100101/00100100/01000010'];
 function pixels(c:CanvasRenderingContext2D,rows:readonly string[],x:number,y:number,size:number,color:string){c.fillStyle=color;const scale=size/rows[0].length;rows.forEach((row,j)=>[...row].forEach((p,i)=>{if(p==='#'||p==='1')c.fillRect(x-size/2+i*scale,y-size/2+j*scale,Math.ceil(scale),Math.ceil(scale));}));}
@@ -20,38 +22,48 @@ function Arcade({friendId,collection='generations',client,paused}:GameComponentP
  const [lang,setLang]=useState<'ja'|'en'>('ja'),[art,setArt]=useState<GenerationSprites|null>(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0),[ready,setReady]=useState(false);
  const [started,setStarted]=useState(false),[manualPause,setManualPause]=useState(false),[view,setView]=useState(createGame),[best,setBest]=useState(0),[saveError,setSaveError]=useState(false),[shareError,setShareError]=useState(false);
  const canvas=useRef<HTMLCanvasElement>(null),world=useRef(createGame()),keys=useRef(new Set<string>()),touch=useRef(new Map<number,string>()),shieldTap=useRef(false),bestRef=useRef(0),alive=useRef(false);
+ const [sound,setSound]=useState(true),[sfx]=useState(()=>createSound(CUES)),soundRef=useRef(true),toggleSoundRef=useRef(()=>{});
  const t=(ja:string,en:string)=>lang==='ja'?ja:en;
  const active=started&&!paused&&!manualPause&&ready;
  useEffect(()=>{alive.current=true;setReady(false);setError('');let current=true;void(async()=>{
   await client.read();const [sprite,raw]=await Promise.all([(collection==='genesis'?createGenesisReader():createFriendReader()).read(friendId),client.loadLocal?.().catch(()=>{if(current)setSaveError(true);return null;})]);
   if(!current)return;setArt(sprite);
-  if(raw){try{const saved=JSON.parse(raw);if(saved.version===1&&Number.isSafeInteger(saved.best)&&saved.best>=0&&saved.best<1e9){bestRef.current=saved.best;setBest(saved.best);}}catch{setSaveError(true);}}
+  try{const saved=parseSave(raw??null);bestRef.current=saved.best;setBest(saved.best);soundRef.current=saved.sound;setSound(saved.sound);sfx.setEnabled(saved.sound);}catch{setSaveError(true);}
   setReady(true);
  })().catch(()=>{if(current)setError('Could not load your Friend. Please retry.');});return()=>{current=false;alive.current=false;};},[client,friendId,collection,attempt]);
  useEffect(()=>{const clear=()=>{keys.current.clear();touch.current.clear();shieldTap.current=false;};const blur=()=>{clear();setManualPause(true);};const visibility=()=>{if(document.hidden)blur();};
  const down=(e:KeyboardEvent)=>{if((e.target as HTMLElement)?.closest('button,input'))return;if(['ArrowLeft','ArrowRight',' ','a','d','A','D','Shift'].includes(e.key)){e.preventDefault();keys.current.add(e.key.toLowerCase());}if(e.key==='Escape'||e.key.toLowerCase()==='p'){e.preventDefault();clear();setManualPause(v=>!v);}};
  const up=(e:KeyboardEvent)=>keys.current.delete(e.key.toLowerCase());window.addEventListener('keydown',down);window.addEventListener('keyup',up);window.addEventListener('blur',blur);document.addEventListener('visibilitychange',visibility);
  return()=>{clear();window.removeEventListener('keydown',down);window.removeEventListener('keyup',up);window.removeEventListener('blur',blur);document.removeEventListener('visibilitychange',visibility);};},[]);
+ // Sound: context on the first gesture, M toggles (unused by play), silent while paused or hidden.
+ useEffect(()=>{const sync=()=>sfx.setSuspended(paused||manualPause||document.hidden);sync();document.addEventListener('visibilitychange',sync);return()=>document.removeEventListener('visibilitychange',sync);},[sfx,paused,manualPause]);
+ useEffect(()=>{const unlock=()=>{sfx.unlock();};const gestures=['pointerdown','pointerup','touchend','keydown','click'] as const;gestures.forEach(g=>window.addEventListener(g,unlock,true));
+ const key=(e:KeyboardEvent)=>{const typing=e.target instanceof HTMLElement&&(e.target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));if(e.key.toLowerCase()==='m'&&!typing&&!e.repeat&&!e.ctrlKey&&!e.metaKey&&!e.altKey)toggleSoundRef.current();};window.addEventListener('keydown',key);
+ return()=>{gestures.forEach(g=>window.removeEventListener(g,unlock,true));window.removeEventListener('keydown',key);sfx.close();};},[sfx]);
  useEffect(()=>{if(!active){keys.current.clear();touch.current.clear();shieldTap.current=false;}},[active]);
  useEffect(()=>{
   let frame=0,last=0,published=0;const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
   function tick(now:number){const dt=last?Math.min(.03,(now-last)/1000):0;last=now;
    if(active&&world.current.status==='playing'){
     const held=(key:string)=>keys.current.has(key)||[...touch.current.values()].includes(key);
-    const next=step(world.current,{move:Number(held('arrowright')||held('d'))-Number(held('arrowleft')||held('a')),fire:held(' ')||held('fire'),shield:shieldTap.current||held('shift')},dt);shieldTap.current=false;world.current=next;
-    if(next.status!=='playing'&&next.score>bestRef.current){bestRef.current=next.score;setBest(next.score);if(client.saveLocal)void client.saveLocal(JSON.stringify({version:1,best:next.score})).catch(()=>{if(alive.current)setSaveError(true);});}
+    const next=step(world.current,{move:Number(held('arrowright')||held('d'))-Number(held('arrowleft')||held('a')),fire:held(' ')||held('fire'),shield:shieldTap.current||held('shift')},dt);shieldTap.current=false;for(const id of soundsFor(world.current,next))sfx.play(id);world.current=next;
+    if(next.status!=='playing'&&next.score>bestRef.current){bestRef.current=next.score;setBest(next.score);sfx.play('best');persist();}
    }
    const c=canvas.current?.getContext('2d');if(c)draw(c,world.current,art,reduced);
    if(now-published>70||world.current.status!=='playing'){setView({...world.current});published=now;}
    frame=requestAnimationFrame(tick);
   }
   frame=requestAnimationFrame(tick);return()=>cancelAnimationFrame(frame);
- },[active,art,client]);
- const start=()=>{if(paused||!ready)return;world.current=createGame();setView(world.current);keys.current.clear();touch.current.clear();setStarted(true);setManualPause(false);canvas.current?.focus();};
+ },[active,art,client,sfx]);
+ /** Writes the best score and the sound setting together; storage failures never block play. */
+ function persist(){if(client.saveLocal)void client.saveLocal(serializeSave({best:bestRef.current,sound:soundRef.current})).catch(()=>{if(alive.current)setSaveError(true);});}
+ // The host refuses saves while its menu is open, so the switch waits for it to close.
+ toggleSoundRef.current=()=>{if(paused||!ready)return;const on=!soundRef.current;soundRef.current=on;setSound(on);sfx.setEnabled(on);persist();if(on&&sfx.unlock())sfx.play('tap');};
+ const start=()=>{if(paused||!ready)return;sfx.play('tap');world.current=createGame();setView(world.current);keys.current.clear();touch.current.clear();setStarted(true);setManualPause(false);canvas.current?.focus();};
  const bind=(action:string)=>({onPointerDown:(e:React.PointerEvent<HTMLButtonElement>)=>{if(!active)return;e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);touch.current.set(e.pointerId,action);},onPointerUp:(e:React.PointerEvent<HTMLButtonElement>)=>{touch.current.delete(e.pointerId);},onPointerCancel:(e:React.PointerEvent<HTMLButtonElement>)=>{touch.current.delete(e.pointerId);},onLostPointerCapture:(e:React.PointerEvent<HTMLButtonElement>)=>{touch.current.delete(e.pointerId);}});
  const finished=view.status!=='playing';
  return <section className="arcade" lang={lang} aria-label="Rare Invaders">
- <header><div className="brand"><small>RARE FRIENDS / ARCADE 01</small><h1>RARE <span>INVADERS</span></h1></div><div className="top-actions"><button onClick={()=>{setLang(lang==='ja'?'en':'ja');if(started)canvas.current?.focus();}}>{lang==='ja'?'English':'日本語'}</button>{started&&!finished&&<button disabled={paused} aria-label={t('一時停止','Pause')} onClick={()=>setManualPause(true)}>Ⅱ</button>}</div></header>
+ <header><div className="brand"><small>RARE FRIENDS / ARCADE 01</small><h1>RARE <span>INVADERS</span></h1></div><div className="top-actions"><button className={`sound-toggle${sound?'':' off'}`} onClick={()=>{toggleSoundRef.current();if(started)canvas.current?.focus();}} disabled={paused||!ready} aria-pressed={sound} aria-label={t('効果音','Sound effects')} title={t('効果音 オン/オフ（M）','Sound effects on/off (M)')} aria-keyshortcuts="M"><span aria-hidden="true">♪</span></button><button onClick={()=>{setLang(lang==='ja'?'en':'ja');if(started)canvas.current?.focus();}}>{lang==='ja'?'English':'日本語'}</button>{started&&!finished&&<button disabled={paused} aria-label={t('一時停止','Pause')} onClick={()=>setManualPause(true)}>Ⅱ</button>}</div></header>
  <div className="game-layout"><div className="cabinet"><div className="hud"><div><small>SCORE</small><strong data-testid="score">{String(view.score).padStart(6,'0')}</strong></div><div><small>WAVE</small><strong>{String(view.wave).padStart(2,'0')} / 05</strong></div><div><small>LIVES</small><strong className="hearts">{'♥'.repeat(view.lives)}{'·'.repeat(Math.max(0,3-view.lives))}</strong></div></div>
  <div className="screen"><canvas ref={canvas} width={WIDTH} height={HEIGHT} tabIndex={0} aria-label={t('矢印キーで移動、スペースで射撃、Shiftでシールド','Arrow keys move, Space fires, Shift shields')}/>
  {(!started||manualPause||finished||error)&&<div className="overlay"><div><span className="label">{finished?'MISSION REPORT':'DEFEND YOUR LITTLE UNIVERSE'}</span><h2>{error?'SIGNAL LOST':finished?view.status==='won'?'SECTOR CLEAR':'TRY AGAIN':started?'PAUSED':<>SMALL FRIEND.<br/>BIG FIGHT.</>}</h2><p>{error||(!started?t('きみのFriendで、迫る編隊を迎え撃とう。5つのウェーブを越えて、星空を守れ。','Your own Friend. Five incoming waves. Hold your ground and bring the stars back home.'):finished?t(`スコア ${view.score}。もう一度、星空へ。`,`Score ${view.score}. One more flight?`):t('準備ができたら、続きを。','Take a breath. The stars can wait.'))}</p>
