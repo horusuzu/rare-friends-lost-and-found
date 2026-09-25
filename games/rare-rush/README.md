@@ -30,15 +30,35 @@ require no transaction or signature. Choose Japanese or English, then board.
 - **Scream meter:** fills with speed over 162 km/h, steep falls and perfect landings. Full
   meter = six seconds of Scream Mode: double points and extra push.
 - Score: 1 point per metre plus bonuses. Pause with P, Escape or the pause button; losing focus pauses.
+- Sound: the ♪ button or M turns sound on and off (see [Sound](#sound)).
 - Best score, distance and top speed are stored locally per SDK session identity.
 
 No entry fee, purchases, RF rewards or redemption promises. Scores have no monetary
 value. The required game.json chance-game schema is unused; no purchase, play or
 settlement action is called. The SDK host uses local preview mode.
 
-Sound is a synthesised wind rush that follows your speed (no audio files), with a
-mute button. Reduced-motion preference removes screen shake, banking, rumble, speed
-streaks, the turbo flash and spinning sparks.
+Reduced-motion preference removes screen shake, banking, rumble, speed streaks, the
+turbo flash and spinning sparks.
+
+## Sound
+
+All sound is synthesised with WebAudio in `sound.ts`; there are no audio files.
+
+- Wind: a filtered-noise rush whose volume and brightness follow your speed.
+- Cues: a whoosh and thump on launch (with a bright rising chord for a perfect launch);
+  chain-lift clacks while a slow car is pulled up a hill; a rising turbo roar; a pickup
+  blip for turbo capsules, a sweep for boost gates and rising ticks for sparks; a chime
+  for a perfect landing, a softer note for a clean (good) landing and a crash thud for a
+  rough one; a gliding scream when Scream Mode starts; a ding at checkpoints; a finish
+  phrase when time runs out; and a fanfare when you beat your previous best score.
+- Toggle: the ♪ button in the top bar (`aria-pressed`, labelled "サウンド オン/オフ" /
+  "Sound on/off") or the **M** key. The setting is saved with your best score in the
+  same local save; older saves without it load with sound on.
+- The AudioContext is created only after your first tap, click or key press, and not at
+  all while sound is off. At most six cues play at once, each with a soft attack and
+  decay into a limiter. All audio, including the wind loop, stops when you mute, while
+  the host or you pause, when the page is hidden, when the ride ends and when the game
+  is closed.
 
 ## X score sharing
 
@@ -53,7 +73,7 @@ npm run build
 node scripts/dev-game.mjs dev games/rare-rush
 node node_modules/typescript/bin/tsc -p games/rare-rush/tsconfig.json
 node scripts/dev-game.mjs check games/rare-rush
-node --test --experimental-test-coverage games/rare-rush/engine.test.mjs
+node --test --experimental-test-coverage games/rare-rush/engine.test.mjs games/rare-rush/sound.test.mjs games/rare-rush/save.test.mjs
 node games/rare-rush/browser.test.mjs
 node scripts/dev-game.mjs build games/rare-rush --outdir release-rush
 ```
