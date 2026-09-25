@@ -66,6 +66,7 @@ node node_modules/typescript/bin/tsc -p games/rare-drop/tsconfig.json
 node scripts/dev-game.mjs check games/rare-drop
 node --test --experimental-test-coverage games/rare-drop/engine.test.mjs games/rare-drop/sound.test.mjs games/rare-drop/save.test.mjs
 node games/rare-drop/browser.test.mjs
+node games/rare-drop/mobile.test.mjs   # phones: 360×640, 375×667, 390×664, 430×740, 664×390 (touch, DPR 3)
 node scripts/dev-game.mjs build games/rare-drop --outdir release-drop
 ```
 

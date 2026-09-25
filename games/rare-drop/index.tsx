@@ -16,17 +16,31 @@ function FriendPixels({ rows, fill, label, size, className }: { rows: Sprite; fi
   </svg>;
 }
 
+/** Canvas backing-store scale: sharp on high-DPR phones, capped so a 3x screen does not triple the fill cost. */
+const MAX_PIXEL_RATIO = 2;
+const pixelRatio = () => Math.min(MAX_PIXEL_RATIO, Math.max(1, Math.round(window.devicePixelRatio || 1)));
+function usePixelRatio() {
+  const [ratio, setRatio] = useState(pixelRatio);
+  useEffect(() => {
+    const update = () => setRatio(pixelRatio());
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return ratio;
+}
+
 /** NEXT preview drawn with the same orb art as the jar, keeping sizes relative to the largest droppable tier. */
 const NEXT_BOX = 64, NEXT_SCALE = (NEXT_BOX / 2 - 3) / RADII[4];
-function NextOrb({ tier, label }: { tier: number; label: string }) {
+function NextOrb({ tier, label, ratio }: { tier: number; label: string; ratio: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const c = ref.current?.getContext('2d');
     if (!c) return;
+    c.setTransform(ratio, 0, 0, ratio, 0, 0);
     c.clearRect(0, 0, NEXT_BOX, NEXT_BOX);
     drawOrb(c, tier, NEXT_BOX / 2, NEXT_BOX / 2, null, NEXT_SCALE);
-  }, [tier]);
-  return <canvas ref={ref} className="next-orb" width={NEXT_BOX} height={NEXT_BOX} data-testid="next-tier" data-tier={tier} role="img" aria-label={label} />;
+  }, [tier, ratio]);
+  return <canvas ref={ref} className="next-orb" width={NEXT_BOX * ratio} height={NEXT_BOX * ratio} data-testid="next-tier" data-tier={tier} role="img" aria-label={label} />;
 }
 
 const newSeed = () => (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
@@ -48,6 +62,7 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
   const canvas = useRef<HTMLCanvasElement>(null), world = useRef<State>(createGame(1));
   const keys = useRef(new Set<string>()), touch = useRef(new Map<number, string>());
   const dropTap = useRef(false), aim = useRef<number | null>(null), record = useRef<SavedRecord>(EMPTY_RECORD), unsaved = useRef(false), alive = useRef(false);
+  const ratio = usePixelRatio();
   const t = (ja: string, en: string) => lang === 'ja' ? ja : en;
   const tierName = (tier: number) => tier < 1 ? '—' : lang === 'ja' ? TIER_INFO[tier - 1].ja : TIER_INFO[tier - 1].en;
   const active = started && !paused && !manualPause && ready;
@@ -78,6 +93,9 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
     const clear = () => { keys.current.clear(); touch.current.clear(); dropTap.current = false; aim.current = null; };
     const blur = () => { clear(); setManualPause(true); };
     const visibility = () => { setHidden(document.hidden); if (document.hidden) blur(); };
+    // iOS can freeze the page without a visibilitychange; pagehide pauses the jar as well.
+    const leave = () => { setHidden(true); blur(); };
+    const back = () => setHidden(document.hidden);
     const down = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
       if (key === 'm' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !(e.target as HTMLElement)?.closest('input')) { e.preventDefault(); toggleRef.current(); return; }
@@ -89,21 +107,25 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
     const up = (e: KeyboardEvent) => keys.current.delete(e.key.toLowerCase());
     window.addEventListener('keydown', down); window.addEventListener('keyup', up);
     window.addEventListener('blur', blur); document.addEventListener('visibilitychange', visibility);
+    window.addEventListener('pagehide', leave); window.addEventListener('pageshow', back);
     return () => {
       clear();
       window.removeEventListener('keydown', down); window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', visibility);
+      window.removeEventListener('pagehide', leave); window.removeEventListener('pageshow', back);
     };
   }, []);
 
   // Sound: no AudioContext until a user gesture; released on unmount.
+  // iOS Safari only resumes audio from touchend/pointerup, so those gestures unlock (or resume) it too.
   useEffect(() => {
     const board = createDropSound();
     board.setEnabled(record.current.sound); sfx.current = board;
     const gesture = () => { if (record.current.sound) board.unlock(); };
-    window.addEventListener('pointerdown', gesture, true); window.addEventListener('keydown', gesture, true);
+    const GESTURES = ['pointerdown', 'pointerup', 'touchend', 'keydown'] as const;
+    for (const type of GESTURES) window.addEventListener(type, gesture, true);
     return () => {
-      window.removeEventListener('pointerdown', gesture, true); window.removeEventListener('keydown', gesture, true);
+      for (const type of GESTURES) window.removeEventListener(type, gesture, true);
       board.dispose(); if (sfx.current === board) sfx.current = null;
     };
   }, []);
@@ -127,13 +149,13 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
         if (next.status === 'over') saveRecord(next);
       }
       const c = canvas.current?.getContext('2d');
-      if (c) drawJar(c, world.current, sprite, reduced, active);
+      if (c) { c.setTransform(ratio, 0, 0, ratio, 0, 0); drawJar(c, world.current, sprite, reduced, active); }
       if (now - published > 90 || world.current.status !== 'playing') { setView(world.current); published = now; }
       frame = requestAnimationFrame(tick);
     }
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [active, sprite, client]);
+  }, [active, sprite, client, ratio]);
 
   /**
    * Keep the record dirty until a write succeeds, so a rejected save (for example a host pause) is retried.
@@ -195,6 +217,8 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
     onPointerMove: (e: React.PointerEvent<HTMLCanvasElement>) => { if (active && (e.pointerType === 'mouse' || e.buttons)) aim.current = toWorld(e); },
     onPointerUp: (e: React.PointerEvent<HTMLCanvasElement>) => { if (!active) return; aim.current = toWorld(e); dropTap.current = true; },
   };
+  /** Long-press must not open the browser menu or the iOS callout over the jar and controls. */
+  const noMenu = (e: React.SyntheticEvent) => e.preventDefault();
   const hold = (action: string) => ({
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => { if (!active) return; e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); aim.current = null; touch.current.set(e.pointerId, action); },
     onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => { touch.current.delete(e.pointerId); },
@@ -215,7 +239,7 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
       ? t(`スコア ${view.score}・最高「${tierName(view.maxTier)}」`, `Score ${view.score} · best orb: ${tierName(view.maxTier)}`)
       : t('準備ができたら、続きを。', 'Take a breath. The jar will wait.'));
 
-  return <section className="jar-game" lang={lang} aria-label="Rare Drop">
+  return <section className="jar-game" lang={lang} aria-label="Rare Drop" onContextMenu={noMenu}>
     <header>
       <div className="brand"><small>RARE FRIENDS / ARCADE 02</small><h1>RARE <span>DROP</span></h1></div>
       <div className="top-actions">
@@ -230,10 +254,10 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
         <div className="hud">
           <div><small>SCORE</small><strong data-testid="score">{String(view.score).padStart(5, '0')}</strong></div>
           <div><small>{t('最高', 'TOP ORB')}</small><strong data-testid="top-tier">{view.maxTier ? `${view.maxTier}/11` : '—'}</strong></div>
-          <div className="next"><small>NEXT</small><NextOrb tier={view.next} label={tierName(view.next)} /></div>
+          <div className="next"><small>NEXT</small><NextOrb tier={view.next} label={tierName(view.next)} ratio={ratio} /></div>
         </div>
         <div className={`screen${view.danger > 0 ? ' warn' : ''}`}>
-          <canvas ref={canvas} width={WIDTH} height={HEIGHT} tabIndex={0} {...pointer}
+          <canvas ref={canvas} width={WIDTH * ratio} height={HEIGHT * ratio} tabIndex={0} {...pointer}
             aria-label={t('タップした位置に落とす。矢印キーで移動、スペースで落とす', 'Tap where to drop. Arrow keys move, Space drops')} />
           {(!started || manualPause || finished || error) && <div className="overlay"><div>
             <span className="label">{finished ? 'RESULT' : 'A MERGE PUZZLE FOR YOUR FRIEND'}</span>

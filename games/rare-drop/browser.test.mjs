@@ -37,7 +37,8 @@ for(const [width,height] of sizes)console.log(await testGame('./games/rare-drop'
  await game.getByRole('button',{name:'落とす',exact:true}).click();await page.clock.runFor(700);
  await jar.focus();await page.keyboard.press('Space');await page.clock.runFor(700);
  // Keep dropping in one column until the jar fills; merges must score along the way.
- for(let i=0;i<400;i++){if(await game.getByRole('heading',{name:/^(JAR FULL|FRIEND MADE!)$/}).count())break;await game.getByRole('button',{name:'落とす',exact:true}).click();await page.clock.runFor(600);}
+ // The jar can fill in real time between the check and the click, so a disabled DROP after game over ends the loop.
+ for(let i=0;i<400;i++){const over=game.getByRole('heading',{name:/^(JAR FULL|FRIEND MADE!)$/});if(await over.count())break;await game.getByRole('button',{name:'落とす',exact:true}).click({timeout:3000}).catch(async error=>{if(!await over.count())throw error;});await page.clock.runFor(600);}
  await game.getByRole('heading',{name:/^(JAR FULL|FRIEND MADE!)$/}).waitFor();
  const finalScore=Number(await game.getByTestId('score').innerText());assert.ok(finalScore>=0);
  if(width===390)await page.screenshot({path:'./artifacts/drop-over-390.png'});
