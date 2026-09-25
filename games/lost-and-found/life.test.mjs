@@ -58,3 +58,15 @@ test('language preference survives save without changing progress; legacy saves 
  assert.equal(restore(JSON.stringify(original),original.friendId)?.bond,original.bond);
  assert.equal(restore(JSON.stringify({...saved,language:'xx'}),original.friendId),null);
 });
+test('the sound setting is saved with the island; older saves load with sound on', async () => {
+ const { soundOn, setSound } = await import('./life.ts');
+ const s = start(); assert.equal(soundOn(s), true, 'a new life starts with sound on');
+ const off = setSound(s, false); assert.equal(soundOn(off), false); assert.equal(soundOn(s), true, 'the original life is unchanged');
+ assert.equal(setSound(off, false), off, 'no change, same life');
+ const saved = restore(JSON.stringify(off), '77251'); assert.deepEqual(saved, off); assert.equal(soundOn(saved), false, 'sound off survives a save');
+ assert.equal(soundOn(restore(JSON.stringify(setSound(off, true)), '77251')), true);
+ const walked = act(s, 'walk'), old = JSON.parse(JSON.stringify(walked)); delete old.sound;
+ const loaded = restore(JSON.stringify(old), '77251'); assert.ok(loaded, 'a save from before the setting still loads');
+ assert.equal(soundOn(loaded), true, 'and plays sound'); assert.equal(loaded.bond, walked.bond); assert.equal(loaded.journal.length, walked.journal.length);
+ for (const bad of ['off', 0, null, 1]) assert.equal(restore(JSON.stringify({ ...off, sound: bad }), '77251'), null, `sound ${JSON.stringify(bad)} is not a valid save`);
+});
