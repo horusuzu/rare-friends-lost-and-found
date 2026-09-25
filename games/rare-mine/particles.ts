@@ -59,7 +59,8 @@ export function createParticles(): Particles {
   function spawn(f: Fx, s: MineState, now: number, reduced: boolean): Cue[] {
     switch (f.kind) {
       case 'strike':
-        toCart(reduced ? 1 : Math.min(6, f.coins), f.coins, now + 0.05, IMPACT);
+        // Cosmetic coins (real-mode taps) fly and clink but carry no value, so the pile never exceeds the real pot.
+        toCart(reduced ? 1 : Math.min(6, f.coins), f.cosmetic ? 0 : f.coins, now + 0.05, IMPACT);
         if (!reduced) { burst(6, IMPACT.x, IMPACT.y, now, [P.goldHi, P.glow, '#ffffff'], 70, 60, 0.3); burst(4, IMPACT.x, IMPACT.y, now, [P.dust, P.rockHi], 50, 240, 0.6); }
         return [{ k: 'tock', n: f.tap ? 1 : 0 }];
       case 'vein':
@@ -74,7 +75,7 @@ export function createParticles(): Particles {
       case 'break':
         burst(reduced ? 3 : 18, IMPACT.x + 6, IMPACT.y, now, [P.rockHi, P.dust, P.rock], 80, 260, 0.8);
         if (!reduced) shakeUntil = Math.max(shakeUntil, now + 0.15);
-        toCart(1, f.coins, now + 0.1, IMPACT);
+        toCart(1, f.cosmetic ? 0 : f.coins, now + 0.1, IMPACT);
         return [{ k: 'crumble', n: 1 }];
       case 'withdraw': {
         const n = reduced ? 3 : 16;

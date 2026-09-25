@@ -139,7 +139,7 @@ test('RF amounts: 4 decimals when small, 2 when large, thousands separators, tru
   assert.equal(fmtRF(0n), '0.0000');
   assert.equal(fmtRF(38_480n * RF / 1000n), '38.4800');
   assert.equal(fmtRF(123_456_789n * 10n ** 12n), '123.4567');
-  assert.equal(fmtRF(38_529n * RF + 129n * 10n ** 16n), '38,529.12');
+  assert.equal(fmtRF(38_529n * RF + 129n * 10n ** 15n), '38,529.12');
   assert.equal(fmtRF(1_234_567n * RF), '1,234,567.00');
   assert.equal(fmtRF(-5n), '0.0000', 'never negative');
   assert.equal(fmtRate(GENESIS_RATE), '16.4');
