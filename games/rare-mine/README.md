@@ -1,27 +1,33 @@
 # Rare Mine
 
-An original idle-and-tap mining game starring your verified Rare Friends NFT. Your Friend swings a
-pickaxe at the rock face of a lantern-lit mine shaft. Every strike throws sparks and chips and pops
-coins that arc into a mine cart, where they clink onto a growing pile. When the pile looks good you
-choose: **Withdraw** it to your safe jar, or **Bet** the whole pot on a 45 % chance to double it.
-Lose, and the whole stake is **burned**.
+An original idle-and-tap mining game starring your verified Rare Friends NFT. The mine shows **the real
+RF your own NFT is earning**: the host reads your NFT's unclaimed rewards (read-only), the game measures
+how fast they grow, and your Friend swings a pickaxe at the rock face of a lantern-lit shaft while
+coins pop, arc into a mine cart and clink onto the pile at a pace tied to that real accrual. When the
+pile looks good you choose: **Withdraw** (record it), or **Bet** the whole pot on a 45 % chance to
+double it. Lose, and the whole stake is **burned**.
 
-Rare Mine targets the Vibeathon **Token Activity** category (most RF burned or spent). **Everything
-here is a simulated preview: the coins are "RF (preview)", not real RF**, and no wallet transaction
-is ever made. Built with FriendSDK 0.1.2, React, a deterministic TypeScript engine and a 256 × 160
-pixel canvas.
+**The RF amounts shown are real and read-only; the bet and the burn are a simulation.** Nothing in
+the game claims, moves, stakes or burns any token, and no wallet transaction is ever made. Real
+claiming happens only on the official site (rarefriends.com/portfolio). A Friend with no accruing
+rewards gets **practice mode**: the original simulated mine with "RF (preview)" coins.
+
+Rare Mine targets the Vibeathon **Token Activity** category (most RF burned or spent). Built with
+FriendSDK 0.1.2, React, a deterministic TypeScript engine and a 256 × 160 pixel canvas.
 
 ## Play
 
 Connect through the SDK host and choose an owned Generations NFT (generation 1+), or the
 configured Genesis #597. The host checks current collection-specific ownership on Robinhood Chain
-(4663); wallet connection and read-only checks need no transaction or signature. Press **Start
-mining** (採掘をはじめる), or **Continue** (つづきから) to reopen your saved mine. Japanese is the
-default; switch to English at any time.
+(4663); wallet connection and read-only checks need no transaction or signature. The title reads your
+NFT's rewards and shows 「NFTの未受取（本物）」 with the amount and rate, then offers
+**本物の報酬で採掘する** (Mine my real rewards), or **つづきから** to reopen your saved ledger. If the
+Friend earns nothing, or rewards cannot be read, it offers **練習モードで採掘** instead (see
+[Practice mode](#practice-mode)). Japanese is the default; switch to English at any time.
 
 | Action | Touch / mouse | Keyboard |
 | --- | --- | --- |
-| Extra strike (builds the combo) | tap the mine | Space or Enter |
+| Tap the rock (cosmetic in real mode, a strike in practice) | tap the mine | Space or Enter |
 | Withdraw the pot | 引き出す / Withdraw | W |
 | Open the bet (odds first) | 倍かけ / Double or burn | B |
 | Confirm / cancel the bet | かける / やめる | Y / N (or Esc) |
@@ -30,9 +36,106 @@ default; switch to English at any time.
 | Pause | Ⅱ | P or Esc |
 
 The game pauses when the page loses focus and whenever the runtime's `paused` prop is set; paused,
-nothing is mined and no input is taken.
+nothing is mined, no input is taken and reward reads stop.
 
-## Mining
+## Real rewards (read-only)
+
+The trusted host exposes `client.readRewards()`: a `FriendRewardsSnapshot` for the selected NFT
+(`claimableRF`, `claimableWETH`, `active`, `blockNumber`, `checkedAt`, bigint 18-decimal base units).
+It is read-only; there is no claim or activate action. The game validates every snapshot (the NFT,
+the collection, the amount types and ranges) before using it (`feed.ts`).
+
+**Polling.** One read at a time (the bridge allows only one pending read), never overlapping:
+
+| Situation | Next read |
+| --- | --- |
+| After the first successful read | 5 s (so the rate is known quickly) |
+| Every read after that | 20 s |
+| Failures before any success | 2 s, 5 s, then 20 s doubling |
+| Failures after a success | 40 s, 80 s, 160 s (cap) |
+| Paused (menu or `paused` prop) or page hidden | no reads until visible and running again |
+
+After 3 failures with no value yet, the game offers practice mode (「本物の報酬を読み取れませんでした
+（残高0という意味ではありません）」). After a failure in real mode the HUD keeps estimating and shows
+「更新できませんでした・推定表示中」 with a retry in the mode bar.
+
+**Rate estimation.** The accrual rate is `(newest − oldest) / (checkedAt delta)` over the snapshots
+of the last 3 minutes (at most 12). Spans under 2 s are ignored as too noisy. Before the second
+snapshot the badge reads 「計測中…」; after it, 「+16.4 RF/分」 (three significant digits). A
+snapshot from an older block or time is ignored. A snapshot **lower** than the last one means the
+holder claimed on the official site: the window restarts from the new value and the rate is kept.
+
+**Interpolation.** Between snapshots the shown value is `last + rate × elapsed`, clamped to 30 s
+(1.5 poll intervals) past the snapshot so a stalled feed never runs away. The display eases toward
+that target (it closes 6× its gap per second), holds instead of running backwards, and jumps only
+after a claim. The pot odometer, the stats and the HUD redraw at most 8 times a second.
+
+**Coins and clinks.** One coin stands for a fixed unit of real RF, the smallest 1-2-5 step
+(… 0.001, 0.002, 0.005, 0.01 …) that keeps coins at or below 6 a second, so real accrual pops
+**2.4–6 coins a second**:
+
+| NFT (mainnet, measured) | Accrual | RF per coin | Coins per second |
+| --- | --- | --- | --- |
+| Genesis #597 | ≈ 16.4 RF/min | 0.05 | ≈ 5.5 |
+| Friend #7730 | ≈ 0.2 RF/min | 0.001 | ≈ 3.3 |
+
+Each whole coin unit the shown value crosses is due; the Friend strikes at most every 0.3 s carrying
+up to 3 of them, and at most 12 wait (a catch-up after a pause never floods the mine). The pile, the
+jar and the clink richness use the pot in these coin units (0.01 RF before the rate is known).
+
+Taps are **cosmetic** in real mode (「タップは演出です」): sparks, chips and a few valueless flying
+coins that never touch the pot. The HUD shows the pot, the rate badge, the NFT's unclaimed RF and
+unclaimed WETH. The mine is labelled 「表示中のRFは本物の報酬（読み取りのみ）」.
+
+## Pot, Withdraw and the simulated bet
+
+The pot is a ledger over the real accrual (`real.ts`), per NFT:
+
+```
+pot = max(0, realEarned − baseline) + streakBonus
+```
+
+- **First baseline is 0**, so the first pot is the whole unclaimed amount.
+- **Withdraw** (引き出す) records the pot as withdrawn and moves the baseline up to the current real
+  value (never down); the streak ends. It is a record only: the mode bar says, as plain text,
+  「本物の受け取りは公式サイト rarefriends.com/portfolio で」. There are no links or popups in game code.
+- **Bet** (倍かけ) stakes the whole pot. The odds are shown **before** anything is staked:
+  「勝率45%・勝てば2倍・負ければ全額バーン」, with the stake, win and burn amounts and
+  「賭け・バーンはシミュレーション。本物のRFは動かず、燃えません」 on the dialog. Real accrual keeps
+  flowing while the odds are open; the stake is the pot at the moment you confirm.
+  - **Win** (45 %): the stake is added to `streakBonus`, so the pot doubles and stays at risk; real
+    accrual continues on top. Streaks cap at 20 wins.
+  - **Lose**: the whole pot is burned (simulated) and the baseline moves up to the current real value.
+- **A claim on the official site** (a lower snapshot, or a saved baseline above the current value on
+  load) records the pot as last seen as withdrawn and restarts the mine from the new value, so the pot
+  is never negative and no stale bonus remains.
+
+The ledger keeps `realized + winnings = withdrawn + burned + bonus` and `staked = winnings + burned`,
+checked in tests and on every save load. The outcome is drawn from the NFT's own seeded bet stream
+when you confirm and saved immediately, settled; the suspense only delays the reveal, so reloading
+cannot undo a burn. The stats panel shows the NFT's unclaimed RF and accrual (real), recorded
+withdrawals, the burned total and record (simulated), with 「賭け・バーンはシミュレーション。…」.
+
+Withdraw is never hidden: it stays available beside the odds and is disabled only while a staked pot
+is rolling.
+
+### Odds and expected value
+
+- P(win) = 0.45, payout ×2, so **EV = 0.45 × 2 = 0.9 × stake**: on average **10 % of every bet
+  burns**. Measured over 100 000 bet draws: 44.9 %.
+- A streak of *k* wins turns a pot *P* into `P × 2^k` with probability `0.45^k`; its expected value
+  is `P × 0.9^k`. A ×16 streak (4 wins) happens 4.1 % of the time.
+
+## Practice mode
+
+Practice mode is used when the host has no reward reader, when reads fail 3 times before any value,
+or when the NFT does not accrue (not activated, or no growth between snapshots). The title and the
+mode bar say why, e.g. 「このFriendには報酬がたまっていません。アクティベートは公式サイトで。」, with
+a **もう一度よむ** retry. The mine is labelled 「練習モード · シミュレーション・本物のRFではありません」 and
+mines "RF (preview)" coins with the rules below. If a retry later finds accruing rewards, the mode bar
+offers **本物の報酬で採掘** and the real ledger continues where it was.
+
+### Practice mining
 
 | Rule | Value |
 | --- | --- |
@@ -57,68 +160,58 @@ exactly. Expected yield is **3.975 coins per strike**. Measured with `balance-si
 An idle Friend fills the pot to 150 coins in about 40 s, when the Withdraw / Bet buttons pulse and a
 hint asks for the first real choice. Over an hour, measured vein and gem rates were 3.04 % and 0.86 %.
 
-## Withdraw or bet
+### Practice withdraw and bet
 
-The two equal buttons are always on screen once the mine opens. **Withdraw is never hidden**: it
-stays available beside the odds and is only disabled while a staked pot is rolling.
+Practice Withdraw moves the whole pot to a safe balance with a coin rain into the jar. The practice
+bet uses the same odds, dialog and suspense as real mode (1.6 s, 0.3 s with reduced motion; tap to
+reveal). Mining pauses while the odds are on screen, so the stake is exactly the pot you saw. Practice
+keeps its own identities: `mined + winnings = withdrawn + burned + pot` and `staked = winnings + burned`.
 
-- **Withdraw (引き出す)**: the whole pot moves to your safe balance with a coin rain into the jar.
-  It is safe forever and ends any streak.
-- **Bet (倍かけ)**: stakes the whole current pot. The odds are shown **before** anything is staked:
-  「勝率45%・勝てば2倍・負ければ全額バーン」 (45 % to win · win ×2 · lose = the whole stake burns),
-  with the exact stake, win and burn amounts. Confirm, then a coin spins with a rising drum roll for
-  1.6 s (0.3 s with reduced motion; tap to reveal at once).
-  - **Win**: the pot doubles and stays at risk. Bet again for a double-up streak (×2, ×4, ×8 …) or
-    withdraw. The streak is capped at 20 wins, after which only Withdraw is offered.
-  - **Lose**: the whole stake burns with flames and "🔥 N burned"; the burned total grows.
+## Stats and sharing
 
-### Odds and expected value
-
-- P(win) = 0.45, payout ×2, so **EV = 0.45 × 2 = 0.9 × stake**: on average **10 % of every bet
-  burns**. Measured over 100 000 bet draws: 44.9 %.
-- A streak of *k* wins turns a pot *P* into `P × 2^k` with probability `0.45^k`; its expected value
-  is `P × 0.9^k`. A ×16 streak (4 wins) happens 4.1 % of the time.
-- Mining pauses while the odds are on screen and during the suspense, so the stake is exactly the
-  pot you saw.
-
-The outcome is drawn from a separate seeded bet stream **when you confirm**, and the game is saved
-already settled. The suspense only delays the reveal; reloading cannot undo a burn.
-
-## Stats
-
-Safe balance, total mined, total withdrawn, **total burned**, best streak and bets won / lost. The
-engine keeps two identities that are checked in tests and on every save load:
-`mined + winnings = withdrawn + burned + pot` and `staked = winnings + burned`.
+Real mode: the NFT's unclaimed RF and accrual rate (real), recorded withdrawals, **burned total
+(simulated)**, best streak and bets won / lost. Practice mode: safe balance, total mined, total
+withdrawn, total burned, best streak and bets won / lost.
 
 After your first bet, **Share on X** posts through the trusted host share bridge (the same one
-Rare Invaders, Rare Drop and Rare Rush use): your burned total and best streak, e.g. 「🔥1200 RF（プレビュー）
-をバーン！ 最高×16（4連勝）」. The host fixes the title and URL; game code cannot supply either.
+Rare Invaders, Rare Drop and Rare Rush use): your burned total (whole RF in real mode) and best streak,
+e.g. 「🔥1200 RF（プレビュー）をバーン！ 最高×16（4連勝）」. The host copy labels it a simulation
+(「シミュレーションです」); the host fixes the title and URL and game code cannot supply either.
 
-## Simulated economy and the live integration gap
+## What is real, what is simulated, and the live integration gap
 
-**RF (preview) is a simulated currency. It is not RF, has no monetary value and cannot be
-redeemed.** It is labelled on the title screen, on the mine itself, in the stats panel and in the
-footer ("シミュレーション・本物のRFではありません"). The bet never calls the SDK's buy, play,
-settle or redeem actions: it is resolved by a seeded local RNG. The required `game.json`
-chance-game block is an unused placeholder (one outcome, no payout), like Rare Delve's.
+| Shown | Real or simulated |
+| --- | --- |
+| Unclaimed RF / WETH, accrual rate, the pot's accrued part | **Real**, read-only from the chain via the host |
+| Withdraw | A local record; real claiming is on rarefriends.com/portfolio |
+| Bet outcome, streak bonus, burned total | **Simulated** (seeded local RNG); no RF moves or burns |
+| Practice-mode coins | "RF (preview)", simulated, no value |
 
-A live version would need a Rare Friends contract that the SDK v0.1.2 chance-game API does not
-provide:
+The labels say so where each number appears: 「表示中のRFは本物の報酬（読み取りのみ）」 on the mine,
+「賭け・バーンはシミュレーション。本物のRFは動かず、燃えません」 (EN: "The bet and burn are simulated.
+Your real RF never moves or burns.") on the bet dialog, the stats and the footer, and
+「練習モード · シミュレーション・本物のRFではありません」 in practice mode. The game never calls the
+SDK's buy, play, settle or redeem actions. The required `game.json` chance-game block is an unused
+placeholder (one outcome, no payout), like Rare Delve's.
 
-- a **variable stake** (the whole pot, not a fixed consumable price) paid in RF from the canonical
-  NFT wallet with an exact approval;
+A real bet on accrued rewards would need what SDK v0.1.2 does not provide:
+
+- the rewards **claimed to the canonical NFT wallet** first (claiming is an official-site action;
+  accrued-but-unclaimed RF cannot be staked);
+- a Rare Friends **bet contract with a variable stake** (the whole pot, not a fixed consumable price)
+  paid in RF from the canonical NFT wallet with an exact approval;
 - a verifiable 45 % win chance from the oracle RNG, with the result settled on-chain before any
   reveal (the local design already fixes the outcome at confirmation and only animates it);
 - a **2× payout funded from a reserved bankroll**, so every open bet's maximum prize is backed
   before it is accepted;
 - a **burn** of lost stakes (transfer to a burn address or `burn()`), which is what the Token
   Activity category measures;
-- mining itself would have to stay off-chain and unbacked, or be replaced by an RF deposit, since
-  free mined coins cannot become real RF.
+- the streak bonus would then be real winnings held by the contract until withdrawn or re-staked.
 
 ## Sound
 
-Synthesised with WebAudio only; no audio files. Coin clinks are 2–4 inharmonic metal partials with a
+Synthesised with WebAudio only; no audio files. In real mode each popping coin lands with a clink,
+so the clink rate follows the real accrual (2.4–6 a second, see the coin-unit rule above). Coin clinks are 2–4 inharmonic metal partials with a
 soft 2 ms attack, random pitch and stereo position; as the pile grows they get richer (more
 partials, longer ring) and more often settle as a pair ("clink-clink"). The pick makes a pitched
 "tock" with a noise click, a breaking rock crumbles, veins sparkle and gems chime. Withdraw rings a
@@ -138,15 +231,26 @@ Layouts are checked at 320 × 568, 390 × 844, 844 × 390, 960 × 640 and 1100 �
 
 ## Saves
 
-Compact JSON (about 150 bytes) written with `client.saveLocal`, the SDK's per-game, per-NFT local
-preview storage, namespaced by collection and token (Genesis and Generations saves never mix). It
-holds both RNG streams, the pot, streak, safe balance, rock, all stats and the sound setting. The
-game saves every 20 strikes, on every withdraw, bet confirmation and sound toggle, and on pause.
-Every field is validated on load, including the ledger identities and the rock/strike counts; a
-malformed or foreign save is ignored with a notice.
+Compact JSON (v2, a few hundred bytes) written with `client.saveLocal`, the SDK's per-game, per-NFT
+local preview storage, namespaced by collection and token (Genesis and Generations saves never mix).
+It holds the real-mode ledger (baseline, bonus, streak, recorded withdrawals, burned, stakes and
+winnings as decimal strings of base units, the bet stream), the practice mine if any (both RNG
+streams, pot, streak, safe balance, rock, stats) and the sound setting. v1 practice-only saves still
+load. The game saves on every withdraw, bet confirmation, claim detection and sound toggle, when
+real mode starts, every 20 practice strikes and on pause. Every field is validated on load, including
+both ledgers' identities; a malformed or foreign save is ignored with a notice. Real amounts are never
+taken from a save: only the ledger's own bookkeeping is.
 
 ## Known limits
 
+- Real accrual is shown from snapshots 20 s apart and interpolated with the measured rate; the shown
+  value can lag or lead the chain slightly, never by more than 30 s of accrual past a snapshot.
+- A claim is inferred from a lower snapshot (or a saved baseline above the current value, with a 1 %
+  margin). Any drop is treated as a claim; the pot as last seen is recorded as withdrawn.
+- A Friend whose rewards stop growing between two snapshots (rate 0) is treated as not accruing on
+  the title; an already running real mine keeps its ledger and simply stops growing.
+- On 844 × 390 and similar short landscape screens the side stats panel scrolls when a retry button
+  is showing.
 - The bet stream is seeded and deterministic, as the preview requires (the browser test predicts each
   result from the exposed `data-betseed`). Someone reading the page with developer tools can
   therefore foresee the next bet. That only matters because it is a simulation; a live version must
@@ -166,15 +270,22 @@ node node_modules/typescript/bin/tsc -p games/rare-mine/tsconfig.json
 node scripts/dev-game.mjs check games/rare-mine
 node --test games/rare-mine/engine-*.test.mjs
 node games/rare-mine/balance-sim.mjs 40
+MINE_SIZE='[[390,844]]' node games/rare-mine/rewards-browser.test.mjs
 MINE_SIZE='[[390,844]]' node games/rare-mine/browser.test.mjs
 MINE_SIZE='[390]' node games/rare-mine/genesis-browser.test.mjs
 node scripts/dev-game.mjs build games/rare-mine --outdir release-mine
 ```
 
-Engine modules (`rng`, `economy`, `game`, `save`) are pure and deterministic; `art`, `layout`,
-`particles`, `render`, `sound`, `panels.tsx` and `index.tsx` are presentation. The browser test
-predicts each bet from the exposed bet seed with the engine itself and checks the UI agrees; it uses
-the SDK's wallet fixtures, which are never shipped in the playable build. Set `MINE_CHROMIUM` to use
+Engine modules (`rng`, `economy`, `game`, `feed`, `real`, `save`) are pure and deterministic;
+`use-rewards.ts` (polling) and `use-real-mine.ts` (ledger glue) are thin hooks; `art`, `layout`,
+`particles`, `render`, `sound`, `panels.tsx`, `real-panels.tsx`, `title.tsx`, `view.ts` and
+`index.tsx` are presentation. `rewards-browser.test.mjs` runs real mode over `rewards-fixture.mjs`,
+a test-only reward RPC fixture whose claimable RF grows with the clock; it checks the rate badge,
+that the odometer rises between polls, withdraw and bet moving the baseline, the pot identity, the
+labels, reload and the practice fallback. `browser.test.mjs` covers practice mode (a not-activated
+Friend) and `genesis-browser.test.mjs` Genesis #597's real rewards. Every browser wait polls `data-*`
+state; each bet is predicted from the exposed bet seed with the engine itself. The fixtures are never
+shipped in the playable build. Set `MINE_CHROMIUM` to use
 an installed Chromium and run one viewport per process with `MINE_SIZE`.
 
 ## Originality and credits
