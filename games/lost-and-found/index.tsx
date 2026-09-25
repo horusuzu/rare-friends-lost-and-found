@@ -25,7 +25,9 @@ function LifeGame({friendId,collection="generations",client,paused}:GameComponen
  const sound=life?soundOn(life):true;
  // Sound: context on the first gesture, silent while muted, paused or hidden; M toggles (not while typing or in a dialog).
  useEffect(()=>{sfx.setEnabled(sound);},[sfx,sound]);
- useEffect(()=>{const sync=()=>sfx.setSuspended(paused||document.hidden);sync();document.addEventListener('visibilitychange',sync);return()=>document.removeEventListener('visibilitychange',sync);},[sfx,paused]);
+ // pagehide covers iOS app switches and the back-forward cache, where visibilitychange can be skipped.
+ useEffect(()=>{const sync=()=>sfx.setSuspended(paused||document.hidden);const hide=()=>sfx.setSuspended(true);sync();document.addEventListener('visibilitychange',sync);window.addEventListener('pagehide',hide);window.addEventListener('pageshow',sync);
+  return()=>{document.removeEventListener('visibilitychange',sync);window.removeEventListener('pagehide',hide);window.removeEventListener('pageshow',sync);};},[sfx,paused]);
  useEffect(()=>{
   const unlock=()=>{sfx.unlock();};const gestures=['pointerdown','pointerup','touchend','keydown','click'] as const;gestures.forEach(g=>window.addEventListener(g,unlock,true));
   const key=(e:KeyboardEvent)=>{const typing=e.target instanceof HTMLElement&&(e.target.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));
@@ -75,8 +77,11 @@ function LifeGame({friendId,collection="generations",client,paused}:GameComponen
  const openBank=()=>{sfx.play('coin');setModal('rewards');};
  const showCard=(card:Card)=>{try{setCardImage(memoryImage(card,life,sprites,language));setModal('card');sfx.play('confirm');}catch(e){setBubble(e instanceof Error?e.message:t("画像を作れませんでした。"));}};
  const level=life.bond<10?t("はじめまして"):life.bond<30?t("気になるともだち"):life.bond<65?t("なかよし"):life.bond<110?t("大切な相棒"):t("家族みたいなふたり");
- return <section className={`life-app ${paused?'is-paused':''} ${economy&&economy.consumables>0n?'gold-frame':''}`} lang={language} aria-label="Rare Friends Island Life">
+ // Long-press on the scene and buttons should not open the browser menu; the name field and the postcard image (long-press to save) keep theirs.
+ const noMenu=(e:React.MouseEvent)=>{if(!(e.target instanceof HTMLInputElement||e.target instanceof HTMLImageElement))e.preventDefault();};
+ return <section className={`life-app ${paused?'is-paused':''} ${economy&&economy.consumables>0n?'gold-frame':''}`} lang={language} aria-label="Rare Friends Island Life" onContextMenu={noMenu}>
  <div className="life-content" inert={Boolean(modal)||paused||undefined}>
+ <div className="life-scroll">
  <header className="life-header"><div><span className="tiny">RARE FRIENDS / OUR LITTLE ISLAND</span><h1>{language==='en'?`${life.name}’s island life.`:`${life.name}と、島ぐらし。`}</h1></div><button type="button" className="language-toggle" disabled={disabled} aria-label={language==='ja'?'English':'日本語'} onClick={()=>change(s=>({...s,language:language==='ja'?'en':'ja'}),'')}>{language==='ja'?'English':'日本語'}</button><button type="button" className={`sound-toggle${sound?'':' off'}`} disabled={disabled} aria-pressed={sound} aria-label={t("効果音")} title={t("効果音 オン/オフ（M）")} aria-keyshortcuts="M" onClick={()=>toggleSoundRef.current()}><span aria-hidden="true">♪</span></button><button className="gear" aria-label={t("設定")} onClick={()=>{setNickname(life.name);setModal('settings');sfx.play('confirm');}}>⚙</button></header>
  <div className="life-layout"><section className="companion">
  <div className="day-strip"><span>☀ <b>{language==='en'?`Day ${life.day}`:`${life.day}日目`}</b></span><span>♡ {level}</span><span className="save-state" role="status">{saving?t("保存中…"):saveError?t("未保存"):loaded?t("保存済み"):t("はじめての朝")}</span></div>
@@ -97,6 +102,7 @@ function LifeGame({friendId,collection="generations",client,paused}:GameComponen
  :tab==='island'?<><div className="panel-eyebrow">LITTLE BY LITTLE</div><h2>{t("ぼくらの島を、育てよう。")}</h2><p className="lead">{t("拾ってきたものが、暮らしになっていく。")}</p><div className="materials"><span>{t("🪵 木")} {life.wood}</span><span>{t("🐚 貝")} {life.shells}</span><span>{t("🌱 種")} {life.seeds}</span></div><div className="projects">{PROJECTS.map(p=>{const done=life.projects.includes(p.id),afford=life.wood>=p.wood&&life.shells>=p.shells&&life.seeds>=p.seeds;return <article key={p.id}><span className="project-icon">{p.icon}</span><div><h3>{t(p.name)}</h3><p>{t(p.description)}</p><small>🪵{p.wood}　🐚{p.shells}　🌱{p.seeds}</small></div><button aria-label={done?t(`${p.name}は完成`):t(`${p.name}をつくる`)} disabled={disabled||done||!afford} onClick={()=>change(s=>build(s,p.id))}>{done?t("完成"):afford?t("つくる"):t("材料待ち")}</button></article>;})}</div><p className="hint">{t("木は森で、貝は海岸で見つかります。島の材料はゲーム内だけのものです。")}</p></>
  :<><div className="panel-eyebrow">THINGS WE WILL REMEMBER</div><h2>{t("ふたりの思い出。")}</h2><p className="lead">{language==='en'?`${life.cards.length}/8 postcards · ${life.outings} outings`:`${life.cards.length}/8 枚のポストカード · ${life.outings}回のおでかけ`}</p>{life.cards.length?<div className="memory-grid">{[...life.cards].reverse().map(c=><button key={c.id} onClick={()=>showCard(c)}><span className={`memory-art memory-${c.place}`}>{PLACES[c.place].icon}</span><small>DAY {c.day}</small><b>{t(c.title)}</b></button>)}</div>:<div className="empty-memory">✉<p>{t("最初の一枚は、これから。")}<br/>{t("お出かけして、おみやげを持って帰ろう。")}</p></div>}<h3 className="journal-title">{t("暮らしの日記")}</h3><div className="journal">{life.journal.slice(0,8).map((m,i)=><p key={`${i}-${m.day}`}><small>{language==='en'?`Day ${m.day}`:`${m.day}日目`}</small>{t(m.text)}</p>)}</div></>}
  </section></div>
+ </div>
  <nav className="life-nav" aria-label={t("島ぐらしメニュー")}>{[['home','⌂',t("おうち")],['outings','☀',t("おでかけ")],['island','♧',t("島づくり")],['memories','✉',t("思い出")]].map(([id,icon,label])=><button key={id} aria-label={t(String(label))} aria-current={tab===id?'page':undefined} disabled={!atHome||saving} onClick={()=>{setTab(id);setFood(false);sfx.play('confirm');}}><span>{icon}</span>{label}</button>)}</nav>
  {saveError&&<div className="save-error" role="alert"><p>{t("まだ保存できていません。")}{t(saveError)}</p><button disabled={saving||paused} onClick={()=>void commit(life)}>{t("保存をやり直す")}</button></div>}
  </div>

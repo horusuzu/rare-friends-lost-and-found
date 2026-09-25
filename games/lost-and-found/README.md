@@ -38,6 +38,8 @@ Preview state is saved through a bounded host bridge to this browser's localStor
 
 The public build includes a standalone web-app manifest, icons and a scope-limited, network-first shell cache. Add it through the browser's Home Screen / Install menu. Ownership still requires an online RPC and an injected wallet; an installed browser context without a compatible wallet cannot play. Use the wallet-enabled browser in that case. No WalletConnect, mobile wallet relay or cross-device synchronization is implemented. Browser/app storage partitions can differ; no automatic migration is promised.
 
+Phone layout (checked with touch-phone emulation at 360×640, 375×667, 390×664, 430×740 and 664×390 by `mobile.test.mjs`): the story scrolls in its own area and the おうち/おでかけ/島づくり/思い出 nav is a bar below it (a rail on the right in landscape), so no text ever sits under the nav and the page itself never scrolls. The host bar is one compact 48 px row in the island's colours below the game. Targets are at least 44 px (nav 52 px), labels at least 12 px; taps do not flash, select or open the long-press menu, except that the postcard image keeps long-press to save and the name field stays editable. The piggy bank panel fits the screen and scrolls inside. Sound pauses while the page is hidden.
+
 ## Economy
 
 Core care, materials, construction and memory collection are free simulated progression. Optional gold room-frame styling integrates the SDK's `buy(1n)` with a 2 demo RF session cosmetic. It never modifies growth, friendship, materials or saves. The runtime simulated ledger resets on reload; the purchased unconsumed item represents that session's cosmetic entitlement. No play/settle/redeem actions, RF payouts, real spending, minting or creator fees. `game.json`'s positive one-wei reward is an unused SDK schema requirement, not a promised reward. Production inventory/cosmetics require a future integration reviewed with the Rare Friends team.
@@ -45,7 +47,7 @@ Core care, materials, construction and memory collection are free simulated prog
 ## Validation and assets
 
 `node --test games/lost-and-found/life.test.mjs games/lost-and-found/sound.test.mjs games/lost-and-found/life-i18n.test.mjs games/lost-and-found/pwa.test.mjs`
-`node games/lost-and-found/life-browser.test.mjs` (set `LOST_FOUND_SIZE`, for example `[[320,568]]`, to run one viewport per process; it also clicks ♪, presses M and checks the setting after a reload)
+`node games/lost-and-found/mobile.test.mjs` (phone sizes with touch emulation), `node games/lost-and-found/life-browser.test.mjs` (set `LOST_FOUND_SIZE`, for example `[[320,568]]`, to run one viewport per process; it also clicks ♪, presses M and checks the setting after a reload)
 `npx tsc -p games/lost-and-found/tsconfig.json`
 
 Original room, scenery, app icon and stories. Canonical selected NFT sprites from FriendSDK. Existing delivery model/artwork remain reference files but are not the active experience. FriendSDK code: LICENSE. Artwork: NOTICE.md. No third-party game characters, logos or proprietary assets are used.

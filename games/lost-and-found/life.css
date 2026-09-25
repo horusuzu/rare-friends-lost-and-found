@@ -13,3 +13,35 @@
 .life-header .sound-toggle.off{color:#98a291;background:#f3f0e0}.life-header .sound-toggle.off::after{content:'';position:absolute;left:11px;right:11px;top:50%;height:2px;border-radius:1px;background:#c98f7c;transform:rotate(-40deg)}
 /* Phones: caption and controls share the top row so the title keeps the full width below. */
 @media(max-width:650px){.life-header{flex-wrap:wrap;row-gap:4px;column-gap:8px}.life-header>div{display:contents}.life-header .tiny{flex:1 1 0;min-width:0;align-self:center}.life-header h1{order:5;flex-basis:100%}.life-header .language-toggle{margin-left:0}}
+/* Touch: no tap flashes, callouts or page bounce; buttons and the scene do not select as text. */
+html,body{overscroll-behavior:none}
+.life-app{overscroll-behavior:none;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.life-app button{touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.life-scene,.life-nav{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.life-dialog input{-webkit-user-select:text;user-select:text}
+/* Phones: the story scrolls in its own area and the nav is a bar below it, so nothing is ever written underneath the nav. */
+@media(max-width:650px),(max-height:500px){
+ .life-app{display:flex;flex-direction:column;overflow:hidden;scroll-padding-bottom:0}
+ .life-content{flex:1;min-height:0;display:flex;flex-direction:column;padding:0}
+ .life-scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:12px max(16px,env(safe-area-inset-right)) 18px max(16px,env(safe-area-inset-left));scrollbar-width:thin}
+ .life-nav{position:static;order:2;flex-shrink:0;left:auto;right:auto;bottom:auto;max-width:none;margin:0;border-width:1px 0 0;border-radius:0;box-shadow:none;gap:6px;padding:5px max(10px,env(safe-area-inset-right)) max(5px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))}
+ .life-nav button{min-height:52px;padding:5px 0;font-size:12px;gap:3px}.life-nav button span{font-size:20px}
+ .save-error{order:1;position:static;margin:6px 12px 0;flex-shrink:0}.save-error button{min-height:44px}
+ .life-header{margin-bottom:12px}.life-header .gear{width:44px;height:44px}.language-toggle{min-height:44px;padding:8px 14px}
+ .close-dialog{min-height:44px}.scene-piggy{width:max(10%,44px)}
+ .life-overlay{padding:10px max(10px,env(safe-area-inset-right)) 10px max(10px,env(safe-area-inset-left))}.life-dialog{max-height:100%;padding:16px;overscroll-behavior:contain}
+ /* 12px floor for every label on a phone. */
+ .tiny,.panel-eyebrow,.day-strip,.save-state,.speech-name,.care-stats span,.care-stats small,.friend-caption,.lead,.home-actions small,.daily-note>span,.food-menu small,.garden-ready small,.destinations small,.event-story>span,.hint,.projects p,.projects small,.projects button,.memory-grid small,.memory-grid b,.journal p,.journal small,.home-piggy small,.earning-active,.earning-inactive,.amount-heading,.real-amounts span,.wallet-amounts,.real-account details,.real-account code,.reward-updated,.reward-official p,.scene-label{font-size:12px}
+ .tiny,.panel-eyebrow{letter-spacing:1px}.scene-label{letter-spacing:1px;bottom:8px}.home-actions small{max-width:none;line-height:1.4}.care-stats{gap:12px}
+}
+/* Phone landscape: the nav becomes a rail on the right and the scene and choices sit side by side. */
+@media(max-height:500px) and (min-aspect-ratio:1/1){
+ .life-content{flex-direction:row}
+ .life-scroll{padding:8px 14px 12px max(14px,env(safe-area-inset-left))}
+ .life-nav{flex-direction:column;justify-content:center;width:92px;border-width:0 0 0 1px;padding:6px max(6px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) 6px}
+ .life-nav button{flex:1 1 0;max-height:78px;min-height:48px}
+ .life-header{margin-bottom:8px}.life-header h1{font-size:19px;margin-top:2px}
+ .life-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px}
+ .day-strip{padding-bottom:8px}.speech{margin:10px 0 8px;min-height:0;padding:10px 14px}.speech p{font-size:13px;line-height:1.7}.friend-caption{margin:8px 0 0}
+ .life-panel{padding-top:0}.life-panel h2{font-size:19px;margin:4px 0}.lead{margin-bottom:12px}.home-actions button{padding:12px 6px}
+}

@@ -1,4 +1,19 @@
 :root { --rf-game-max-width:1120px; --rf-game-aspect-ratio:1.28; }
-html,body{background:#e4e8da;}
+html,body{background:#e4e8da;overscroll-behavior:none;}
 .rf-game-frame{border-radius:24px;border:1px solid #cbd3c1;box-shadow:0 20px 70px #314a3f12;}
-@media(max-width:650px){:root{--rf-game-aspect-ratio:auto;}.rf-game-frame{height:100dvh;min-height:600px;border:0;border-radius:0;}}
+/* The host bar in the island's paper-and-leaf palette (it was the SDK's plain grey boxes). */
+.rf-frame-toolbar>*{border-color:#bcc5a1;background:#faf6e8;color:#38584b;border-radius:999px;}
+.rf-frame-toolbar .rf-frame-mode{border-color:#dcdcc5;background:#faf6e8e6;color:#6f8472;}
+.rf-frame-toolbar button{background:#faf6e8;color:#38584b;border-color:#bcc5a1;touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+.rf-frame-toolbar button:hover:not(:disabled){background:#eef0e2;}
+.rf-frame-toolbar button:focus-visible{outline:3px solid #cc8f62;outline-offset:2px;}
+/* Phones: the game fills the screen and the host bar is one compact row below it, never over the nav. */
+@media(max-width:650px),(max-height:500px){
+ :root{--rf-game-aspect-ratio:auto;}
+ .rf-game-frame{height:100vh;height:100dvh;min-height:0;max-height:none;border:0;border-radius:0;box-shadow:none;}
+ .rf-frame-toolbar{position:static;order:2;flex-shrink:0;left:auto;right:auto;bottom:auto;gap:6px;font-size:12px;background:#eef0e2;border-top:1px solid #dcdcc5;
+  padding:2px max(6px,env(safe-area-inset-right)) max(2px,env(safe-area-inset-bottom)) max(6px,env(safe-area-inset-left));}
+ .rf-frame-viewport{order:1;}
+ .rf-frame-toolbar .rf-frame-mode{font-size:12px;border:0;background:none;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;}
+ .rf-frame-toolbar button{min-height:44px;padding:4px 12px;font-size:12px;flex:0 1 auto;}
+}
