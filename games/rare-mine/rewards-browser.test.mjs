@@ -25,6 +25,16 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     const until = async (what, fn, ms = 30_000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return; await sleep(60); } throw new Error(`timed out: ${what}`); };
     const shot = async name => { if (shots.has(width)) await page.screenshot({ path: `./artifacts/mine2-${name}-${width}.png` }); };
     const tap = id => game.getByTestId(id).click();
+    // Short portrait phones fold the mode notice and sharing into a stats sheet: open it for those checks, then close it.
+    const toggle = game.getByTestId('stats-toggle');
+    const inSheet = async fn => {
+      const folded = await toggle.isVisible();
+      if (folded && await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+      await fn();
+      if (folded && await toggle.isVisible() && await toggle.getAttribute('aria-expanded') === 'true') await toggle.click();
+      // Leave focus off the toggle: Space on a focused button presses it (the mine's Space strike skips buttons).
+      if (folded) await game.locator('body').evaluate(() => document.activeElement?.blur?.());
+    };
     const rock = async () => { const b = await screen.boundingBox(); await screen.click({ position: { x: b.width * 0.93, y: b.height * 0.5 } }); };
     const connect = async () => {
       await page.reload();
@@ -55,7 +65,7 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     await game.getByTestId('sim-note').getByText(REAL_NOTE, { exact: true }).waitFor();
     await game.getByTestId('sim-note').getByText('タップは演出です', { exact: true }).waitFor();
     await game.getByTestId('stats-note').getByText(BET_NOTE, { exact: true }).waitFor();
-    await game.getByTestId('mode-bar').getByText('本物の受け取りは公式サイト rarefriends.com/portfolio で', { exact: true }).waitFor();
+    await inSheet(() => game.getByTestId('mode-bar').getByText('本物の受け取りは公式サイト rarefriends.com/portfolio で', { exact: true }).waitFor());
     assert.equal(await game.locator('a').count(), 0, 'no links from game code');
 
     // Layout: 44px targets clear of the host wallet toolbar; Withdraw and Bet equal-sized.
@@ -142,7 +152,7 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     assert.equal(await num('won'), wins); assert.equal(await num('lost'), losses); assert.equal(await num('best'), best);
     assert.equal(await game.getByTestId('stat-record').textContent(), `${wins} · ${losses}`);
     assert.match(await game.getByTestId('stat-burned').textContent(), /^🔥 [\d,]+\.\d+$/);
-    await game.getByTestId('share').waitFor();
+    await inSheet(() => game.getByTestId('share').waitFor());
 
     // Sound: ♪ reports its state and M toggles it.
     const sound = game.getByTestId('sound');
@@ -187,12 +197,14 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     await until('practice mine', async () => await attr('mode') === 'practice' && await num('pot') > 0);
     await game.getByTestId('sim-note').getByText('練習モード', { exact: true }).waitFor();
     await game.getByTestId('sim-note').getByText('シミュレーション・本物のRFではありません', { exact: true }).waitFor();
-    await game.getByTestId('mode-bar').getByText(`練習モード: ${INACTIVE}`, { exact: true }).waitFor();
+    await inSheet(() => game.getByTestId('mode-bar').getByText(`練習モード: ${INACTIVE}`, { exact: true }).waitFor());
     await shot('practice');
     fx.inactive = false;
-    await tap('retry-rewards');
-    await game.getByTestId('go-real').waitFor();
-    await tap('go-real');
+    await inSheet(async () => {
+      await tap('retry-rewards');
+      await game.getByTestId('go-real').waitFor();
+      await tap('go-real');
+    });
     await until('back to real', async () => await attr('mode') === 'real');
     assert.equal(await big('baseline'), kept.baseline, 'the real ledger is kept across practice');
 

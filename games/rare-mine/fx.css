@@ -22,7 +22,7 @@
   background:linear-gradient(90deg,#ff4d6d,#ffb13b,#fff1a8,#5be37d,#4fd8cc,#6c8cff,#c77dff);filter:drop-shadow(0 .6cqw 0 #1a0024) drop-shadow(0 0 2.4cqw #ff5ad2cc)}
 .reach-fx.tease .reach-call{animation:tease-shake .16s steps(2,end) infinite}
 .reach-line{position:absolute;left:50%;bottom:12cqw;transform:translateX(-50%);max-width:94%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  padding:.4cqw 1.8cqw;border-radius:99px;background:#000b;color:var(--cream);font-size:max(2.2cqw,10px);pointer-events:none}
+  padding:.4cqw 1.8cqw;border-radius:99px;background:#000b;color:var(--cream);font-size:max(2.2cqw,12px);pointer-events:none}
 
 .win-fx,.lose-fx{position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:8px}
 .edge-lights i{position:absolute;inset:0;border-radius:8px;opacity:0;box-shadow:inset 0 0 0 1cqw var(--a),inset 0 0 6cqw var(--a);animation:strobe 1s steps(1,end) infinite}
@@ -43,7 +43,7 @@
 .win-mult{position:relative;font:900 4.4cqw/1 var(--display);letter-spacing:.5cqw}
 .win-count{position:relative;display:block;min-width:6ch;padding:.3cqw 1.4cqw;border-radius:1cqw;background:#140f0cd8;color:var(--gold-hi);
   font:800 5cqw/1.15 ui-monospace,'SF Mono',Menlo,monospace;font-variant-numeric:tabular-nums}
-.win-card small{position:relative;font-weight:800;font-size:max(2.4cqw,10px)}
+.win-card small{position:relative;font-weight:800;font-size:max(2.4cqw,12px)}
 .streak-badge{position:absolute;right:2cqw;top:22cqw;padding:.8cqw 2cqw;border-radius:99px;background:linear-gradient(#ff5a3a,#b8120c);color:#fff;
   font:900 max(3.4cqw,12px)/1 var(--display);letter-spacing:.2cqw;box-shadow:0 0 0 .4cqw #fff1a8,0 .8cqw 1.6cqw #000a;transform:rotate(-8deg);
   animation:badge-in .4s cubic-bezier(.2,1.6,.4,1) .25s both}
@@ -53,7 +53,7 @@
   transform:translateX(-50%);border-radius:2cqw;text-align:center;color:#fff4e6;background:linear-gradient(#5a1208f0,#1a0604f0);
   box-shadow:inset 0 0 0 .4cqw #ff7a2e88,0 0 5cqw #ff5a1f66,0 1.4cqw 3cqw #000c;animation:lose-in .45s var(--ease) .3s both,smoke-out .6s ease-in 1.6s forwards}
 .lose-card b{font:900 7cqw/1.05 var(--display);letter-spacing:.2cqw;white-space:nowrap;color:var(--flame);filter:drop-shadow(0 .5cqw 0 #3a0800)}
-.lose-card small{font-size:max(2.4cqw,10px);color:#ffd9c2}
+.lose-card small{font-size:max(2.4cqw,12px);color:#ffd9c2}
 
 @keyframes edge-blink{0%{opacity:1}50%{opacity:.2}}
 @keyframes call-in{from{opacity:0;transform:translateX(-50%) scale(2.1)}to{opacity:1;transform:translateX(-50%) scale(1)}}

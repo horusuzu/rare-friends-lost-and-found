@@ -21,6 +21,8 @@ export interface MineAudio {
   cue(q: FxCue): void;
   /** Fade out everything that is playing or scheduled (fever loops included). */
   hush(): void;
+  /** Resume a suspended (or iOS-interrupted) context; call it from a touchend / pointerup / click / keydown handler. */
+  wake(): void;
   close(): void;
 }
 
@@ -66,7 +68,8 @@ export function buildAudio(ctx: BaseAudioContext & { close?: () => Promise<void>
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
   let voices = 0, nextClink = 0;
 
-  const wake = () => { if (ctx.state === 'suspended') void ctx.resume?.().catch(() => undefined); };
+  // iOS reports 'interrupted' after a call or a trip to the background; both states resume the same way.
+  const wake = () => { if (ctx.state !== 'running' && ctx.state !== 'closed') void ctx.resume?.().catch(() => undefined); };
   const now = () => ctx.currentTime + 0.01;
   /** Reserve a voice; false when the cap is reached (the sound is simply skipped). */
   function voice(node: AudioScheduledSourceNode, at: number, end: number, start: () => void = () => node.start(at)): boolean {
@@ -168,6 +171,7 @@ export function buildAudio(ctx: BaseAudioContext & { close?: () => Promise<void>
       setTimeout(() => old.disconnect(), 150);
       master = makeMaster(); nextClink = 0;
     },
+    wake,
     close() { void ctx.close?.().catch(() => undefined); },
   };
 }

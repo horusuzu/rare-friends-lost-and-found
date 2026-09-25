@@ -22,6 +22,16 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     const until = async (what, fn, ms = 20_000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return; await sleep(50); } throw new Error(`timed out: ${what}`); };
     const shot = async name => { if (shots.has(width)) await page.screenshot({ path: `./artifacts/mine-${name}-${width}.png` }); };
     const tap = id => game.getByTestId(id).click();
+    // Short portrait phones fold the mode notice and sharing into a stats sheet: open it for those checks, then close it.
+    const toggle = game.getByTestId('stats-toggle');
+    const inSheet = async fn => {
+      const folded = await toggle.isVisible();
+      if (folded && await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click();
+      await fn();
+      if (folded && await toggle.isVisible() && await toggle.getAttribute('aria-expanded') === 'true') await toggle.click();
+      // Leave focus off the toggle: Space on a focused button presses it (the mine's Space strike skips buttons).
+      if (folded) await game.locator('body').evaluate(() => document.activeElement?.blur?.());
+    };
     const rock = async () => { const b = await screen.boundingBox(); await screen.click({ position: { x: b.width * 0.93, y: b.height * 0.5 } }); };
     const connect = async () => {
       await page.reload();
@@ -41,7 +51,7 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     await until('mining', async () => await attr('started') === 'true' && await attr('phase') === 'mine');
     await game.getByTestId('sim-note').getByText('シミュレーション・本物のRFではありません', { exact: true }).waitFor();
     await game.getByTestId('sim-note').getByText('練習モード', { exact: true }).waitFor();
-    await game.getByTestId('retry-rewards').waitFor();
+    await inSheet(() => game.getByTestId('retry-rewards').waitFor());
 
     // Layout: every control is a 44px target clear of the host wallet toolbar; Withdraw and Bet are the same size.
     const wallet = await page.getByRole('button', { name: 'Open Friend wallet', exact: true }).boundingBox();
@@ -117,7 +127,7 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     assert.match(await game.getByTestId('stat-burned').textContent(), new RegExp(`🔥 ${(await num('burned')).toLocaleString('en-US')}`));
     assert.equal(await game.getByTestId('stat-record').textContent(), `${wins} · ${losses}`);
     assert.match(await game.getByTestId('stat-best').textContent(), new RegExp(`×${2 ** maxStreak}`));
-    await game.getByTestId('share').waitFor();
+    await inSheet(() => game.getByTestId('share').waitFor());
 
     // Cancel keeps the pot; Withdraw is offered right beside the odds.
     await until('pot for cancel', async () => await num('pot') > 0);

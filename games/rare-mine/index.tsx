@@ -56,6 +56,8 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
   const [banner, setBanner] = useState<BannerInfo | null>(null), [toast, setToast] = useState<Toast | null>(null);
   const [result, setResult] = useState<ResultInfo | null>(null), [fxView, setFxView] = useState<FxView | null>(null);
   const [sharing, setSharing] = useState(false), [shareError, setShareError] = useState(false);
+  /** Phones show the stats as a strip; this opens the full panel (mode notice, share) as a sheet above it. */
+  const [statsOpen, setStatsOpen] = useState(false);
   const [, setHud] = useState(0);
   const game = useRef<MineState | null>(null), canvas = useRef<HTMLCanvasElement>(null), scene = useRef(createScene());
   const keep = useRef<SaveData>(EMPTY_SAVE);
@@ -233,6 +235,9 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
   useEffect(() => {
     const blur = () => handlers.current.pauseNow();
     const visibility = () => { if (document.hidden) blur(); };
+    // iOS only starts audio from a touchend / pointerup / click / key press: create and resume the context there.
+    const unlock = () => { ensureAudio(); audio.current?.wake(); };
+    const unlockOn = ['touchend', 'pointerup', 'click', 'keydown'] as const;
     const down = (e: KeyboardEvent) => {
       const h = handlers.current, key = e.key.toLowerCase(), s = game.current;
       const onButton = (e.target as HTMLElement)?.closest?.('button');
@@ -251,8 +256,13 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
       if (key === 'b' && !e.repeat) { e.preventDefault(); h.doAsk(); }
     };
     window.addEventListener('keydown', down);
-    window.addEventListener('blur', blur); document.addEventListener('visibilitychange', visibility);
-    return () => { window.removeEventListener('keydown', down); window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', visibility); };
+    for (const type of unlockOn) window.addEventListener(type, unlock, { passive: true });
+    window.addEventListener('blur', blur); window.addEventListener('pagehide', blur); document.addEventListener('visibilitychange', visibility);
+    return () => {
+      window.removeEventListener('keydown', down);
+      for (const type of unlockOn) window.removeEventListener(type, unlock);
+      window.removeEventListener('blur', blur); window.removeEventListener('pagehide', blur); document.removeEventListener('visibilitychange', visibility);
+    };
   }, []);
   useEffect(() => () => { audio.current?.close(); audio.current = null; }, []);
   // Pause, page hide and blur stop every sound at once (fever loops included); the show's clocks freeze with the game.
@@ -282,7 +292,7 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
   }
   const stagePress = (e: ReactPointerEvent<HTMLDivElement>) => {
     if ((e.target as HTMLElement).closest('button') || !activeRef.current) return;
-    e.preventDefault(); strike();
+    e.preventDefault(); setStatsOpen(false); strike();
   };
   const s = view, fx = fxView;
   const real = s?.mode === 'real';
@@ -330,7 +340,7 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
       data-strikes={s?.stats.strikes ?? 0} data-combo={combo} data-depth={s?.depth ?? 0} data-betseed={ledger?.betSeed ?? s?.betSeed ?? ''}
       data-last={s?.last ? (s.last.win ? 'win' : 'lose') : ''} data-lastid={s?.last?.id ?? 0}
       data-sound={String(soundOn)} data-paused={String(!active)} data-saves={saves} data-lang={lang} data-reduced={String(reduced)}
-      onPointerDown={stagePress}>
+      onPointerDown={stagePress} onContextMenu={e => e.preventDefault()}>
       <canvas ref={canvas} width={SCENE_W} height={sceneH} role="img"
         aria-label={real ? tt(`${label}が本物の報酬を採掘している。`, `${label} is mining your real rewards.`) : tt(`${label}が岩をほっている。タップで追加の一撃。`, `${label} is mining. Tap the rock to strike.`)} />
       {s && <div className="hud">
@@ -365,7 +375,8 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
       canWithdraw={active && s.phase !== 'roll' && (real ? potWei > 0n : s.pot > 0)}
       canBet={active && (s.phase === 'confirm' || (real ? !!ledger && shown !== null && s.phase === 'mine' && canRealBet(ledger, shown) : s.phase === 'mine' && s.pot > 0 && s.streak < MAX_STREAK))} />}
     {s && <StatsPanel lang={lang} rows={ledger ? realRows(ledger, reader.last?.rf ?? 0n, reader.feed.rate, lang) : practiceRows(s)}
-      note={real ? REAL_STATS_NOTE : PRACTICE_NOTE} canShare={!!client.shareScore && bets > 0} sharing={sharing || paused} onShare={share}>
+      note={real ? REAL_STATS_NOTE : PRACTICE_NOTE} canShare={!!client.shareScore && bets > 0} sharing={sharing || paused} onShare={share}
+      open={statsOpen} onToggle={() => setStatsOpen(v => !v)} alert={!real && decision.mode === 'real'}>
       <ModeBar lang={lang} real={real} decision={decision} failures={reader.failures} busy={rewards.busy} onRetry={rewards.retry} onGoReal={startReal} />
     </StatsPanel>}
     <p className="sr-only" role="status" aria-live="polite">{announcement(lang, banner, toast)}</p>

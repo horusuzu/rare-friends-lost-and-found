@@ -245,7 +245,8 @@ cash-register "cha-ching" with a coin cascade into the jar; a bet plays a rising
 bright fanfare, a loss a whoosh and crackle. Clinks are rate-limited (22 ms apart), scheduled nodes
 are capped at 64 and everything runs through a gentle compressor at low volume, so long sessions stay
 pleasant. The **♪ on/off** button (`aria-pressed`) and **M** toggle sound; the setting is saved. The
-AudioContext starts on the first user gesture.
+AudioContext starts on the first user gesture and is resumed on the first touchend, pointer-up, click or
+key press (iOS only unlocks audio from those), including after iOS interrupts it.
 
 ## Motion and accessibility
 
@@ -254,6 +255,24 @@ strike instead of up to six, no sparks, shake, flash or lantern flicker, a stati
 spin, and a 0.3 s reveal. The odometer rolls with transforms only. Controls are real buttons of at
 least 44 px, the combo exposes `role="meter"` and results are announced with `role="status"`.
 Layouts are checked at 320 × 568, 390 × 844, 844 × 390, 960 × 640 and 1100 × 900 with no overflow.
+
+## Phones
+
+On short portrait screens (a game frame under 760 px tall, e.g. an iPhone with Safari's bars) the mine
+fills the space above a thumb-height Withdraw / Bet row, and the stats fold into a compact strip: safe
+balance, burned, won · lost and the simulation note, with a **記録 / Stats** toggle (`aria-expanded`)
+that opens the full panel, the mode notice and **Share on X** as a sheet above it. A dot on the toggle
+means real rewards became readable. Tapping the mine closes the sheet; the keyboard-hint footer is
+hidden. On landscape phones the controls and stats sit in a side column. Text in play is at least
+12 px; the mine owns its gestures (`touch-action: none`, no long-press menu or text selection), buttons
+use `touch-action: manipulation`, and the documents have `overscroll-behavior: none`. The game pauses on
+blur, `visibilitychange` and `pagehide`. `host.css` makes the host toolbar one 48 px row (44 px
+targets, 12 px text) and edge to edge on phones, with a `100vh` fallback for `100dvh`.
+`mobile.test.mjs` checks 360 × 640, 375 × 667, 390 × 664, 430 × 740 and 664 × 390 with phone
+emulation (touch, DPR 3, mobile UA): no scroll in either document, the mine at least 45 % of the
+viewport height in portrait (50 % landscape), 48 px Withdraw / Bet below the mine and above the host
+toolbar, the odds, reach and result cards inside the mine with one-line banners, the sheet and share
+button, pause, and real mode's HUD.
 
 ## Saves
 
@@ -299,6 +318,7 @@ node games/rare-mine/balance-sim.mjs 40
 MINE_SIZE='[[390,844]]' node games/rare-mine/rewards-browser.test.mjs
 MINE_SIZE='[[390,844]]' node games/rare-mine/browser.test.mjs
 MINE_SIZE='[390]' node games/rare-mine/genesis-browser.test.mjs
+MINE_SIZE='[[390,664]]' node games/rare-mine/mobile.test.mjs
 node scripts/dev-game.mjs build games/rare-mine --outdir release-mine
 ```
 

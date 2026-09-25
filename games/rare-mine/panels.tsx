@@ -100,6 +100,8 @@ export function ConfirmPanel({ lang, stake, win, live = false, note, onConfirm, 
 }
 
 export type StatRow = readonly [label: Text, value: string, id: string, tone?: string];
+/** The rows the phone strip keeps on screen; the others, the mode notice and sharing live in the sheet. */
+const STRIP_ROWS = new Set(['safe', 'burned', 'record']);
 export interface StatsProps {
   readonly lang: Lang;
   readonly rows: readonly StatRow[];
@@ -107,13 +109,24 @@ export interface StatsProps {
   readonly canShare: boolean;
   readonly sharing: boolean;
   readonly onShare: () => void;
+  /** Phone strip only (CSS shows the toggle on short portrait screens): whether the sheet is open. */
+  readonly open?: boolean;
+  readonly onToggle?: () => void;
+  /** Something in the sheet wants attention (real rewards became readable): the toggle shows a dot. */
+  readonly alert?: boolean;
   readonly children?: ReactNode;
 }
-export function StatsPanel({ lang, rows, note, canShare, sharing, onShare, children }: StatsProps) {
-  return <section className="stats" aria-label={pick(lang, ['記録', 'Stats'])}>
-    <dl>{rows.map(([label, value, id, tone]) => <div key={id} className={tone ?? ''}><dt>{pick(lang, label)}</dt><dd data-testid={`stat-${id}`}>{value}</dd></div>)}</dl>
+export function StatsPanel({ lang, rows, note, canShare, sharing, onShare, open = false, onToggle, alert = false, children }: StatsProps) {
+  const label = pick(lang, ['記録', 'Stats']);
+  return <div className="stats-slot"><section className={`stats${open ? ' open' : ''}`} aria-label={label}>
+    <dl>{rows.map(([label, value, id, tone]) => <div key={id} className={`${tone ?? ''}${STRIP_ROWS.has(id) ? '' : ' more'}`}><dt>{pick(lang, label)}</dt><dd data-testid={`stat-${id}`}>{value}</dd></div>)}</dl>
     <p className="unit" data-testid="stats-note">{pick(lang, note)}</p>
-    {children}
-    {canShare && <button className="share" onClick={onShare} disabled={sharing} data-testid="share">{pick(lang, ['記録をXでシェア', 'Share on X'])}</button>}
-  </section>;
+    {onToggle && <button className={`stats-toggle${alert ? ' alert' : ''}`} onClick={onToggle} aria-expanded={open} aria-controls="stats-sheet" data-testid="stats-toggle"
+      aria-label={open ? pick(lang, ['記録を閉じる', 'Close stats']) : alert ? pick(lang, ['記録を開く（お知らせあり）', 'Open stats (new notice)']) : pick(lang, ['記録を開く', 'Open stats'])}>
+      <span aria-hidden="true">{open ? '▾' : '▴'}</span><small aria-hidden="true">{label}</small></button>}
+    <div className="stats-sheet" id="stats-sheet">
+      {children}
+      {canShare && <button className="share" onClick={onShare} disabled={sharing} data-testid="share">{pick(lang, ['記録をXでシェア', 'Share on X'])}</button>}
+    </div>
+  </section></div>;
 }
