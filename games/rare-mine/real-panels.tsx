@@ -41,7 +41,8 @@ export function RealHud({ lang, pot, streak, rate, claimable, weth, stale }: Rea
 /** The stage note: in real mode the number is real (read-only) and taps are cosmetic; in practice mode it is a simulation. */
 export function StageNote({ lang, real }: { lang: Lang; real: boolean }) {
   return <p className={`sim${real ? ' real' : ''}`} data-testid="sim-note">
-    {real ? <><span>{pick(lang, REAL_NOTE)}</span><span className="tap">{pick(lang, TAP_NOTE)}</span></> : pick(lang, SIM_NOTE)}
+    {real ? <><span>{pick(lang, REAL_NOTE)}</span><span className="tap">{pick(lang, TAP_NOTE)}</span></>
+      : <><span className="practice">{pick(lang, PRACTICE)}</span><span>{pick(lang, SIM_NOTE)}</span></>}
   </p>;
 }
 

@@ -50,10 +50,10 @@ export function useRealMine(reader: Reader, onClaim: () => void): RealMine {
   const toCoins = (wei: bigint): number => Number(wei * 1000n / (unit() ?? FALLBACK_UNIT)) / 1000;
 
   /** A saved baseline far above the current value means a claim happened while away (1 % margin for interpolation). */
-  function checkSaved(l: RealLedger, value: bigint): RealLedger {
-    if (value * 100n >= l.baseline * 99n) return l;
-    reset.current = true; claimRef.current();
-    return realClaimed(l, l.baseline, value);
+  function checkSaved(l: RealLedger, value: bigint): boolean {
+    if (value * 100n >= l.baseline * 99n) return false;
+    reset.current = true; ledger.current = realClaimed(l, l.baseline, value);
+    return true;
   }
 
   return {
@@ -63,8 +63,10 @@ export function useRealMine(reader: Reader, onClaim: () => void): RealMine {
       const l0 = ledger.current, r = readerRef.current;
       const target = project(r.feed, Date.now());
       if (!l0 || target === null || !r.last) return s;
-      const l = checkLoad.current ? checkSaved(l0, r.last.rf) : l0;
-      checkLoad.current = false; ledger.current = l;
+      const claimed = checkLoad.current && checkSaved(l0, r.last.rf);
+      checkLoad.current = false;
+      if (claimed) claimRef.current();
+      const l = ledger.current ?? l0;
       const prev = shown.current, next = ease(prev, target, dt, reset.current);
       reset.current = false; shown.current = next;
       if (prev !== null) due.current = Math.min(MAX_DUE, due.current + coinsCrossed(prev, next, unit()));
