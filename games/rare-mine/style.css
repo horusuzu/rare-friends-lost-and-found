@@ -88,10 +88,10 @@ kbd{font:700 .75em ui-monospace,monospace;padding:0 .3em;border-radius:.3em;back
 .paused{background:#140f0ce8}.paused h2{margin:0;font:900 9cqw/1 var(--display);letter-spacing:1cqw;color:var(--gold)}.paused p{margin:0;font-size:max(3cqw,12px)}
 .paused button[aria-pressed]{background:var(--rock-hi);color:var(--cream);box-shadow:none}
 
-.actions{grid-area:act;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.actions{grid-area:act;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .actions button{min-height:56px;display:flex;flex-direction:column;justify-content:center;gap:2px;padding:6px 10px;border:0;border-radius:14px;text-align:center;
   transition:transform var(--fast) var(--ease),box-shadow var(--fast) var(--ease)}
-.actions b{font:900 19px/1 var(--display);letter-spacing:1px}.actions small{font-size:11px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.actions b{font:900 19px/1 var(--display);letter-spacing:1px;white-space:nowrap}.actions small{font-size:11px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .withdraw{background:linear-gradient(#fff1a8,#f5c542 60%,#d9a232);color:var(--ink);box-shadow:0 5px 0 var(--gold-lo)}
 .bet{background:linear-gradient(#ff9a4e,#e04a2a 65%,#b8321c);color:#fff8ec;box-shadow:0 5px 0 #7a1c10}
 .actions button:hover:not(:disabled){filter:brightness(1.08) saturate(1.1)}
@@ -150,8 +150,9 @@ kbd{font:700 .75em ui-monospace,monospace;padding:0 .3em;border-radius:.3em;back
 @media (min-aspect-ratio:5/4) and (max-height:500px){
   :root{--side:260px}.brand small,.mine footer{display:none}.brand h1{font-size:18px}.mine{gap:4px;padding-top:4px;grid-template-rows:auto minmax(0,1fr) auto auto minmax(0,1fr);
     grid-template-areas:"head head" "stage ." "stage act" "stage stats" "stage ."}
-  .actions{grid-template-columns:1fr 1fr}.actions button{min-height:52px}.actions b{font-size:16px}.actions small{font-size:10px}
+  .actions{grid-template-columns:repeat(2,minmax(0,1fr))}.actions button{min-height:52px}.actions b{font-size:16px}.actions small{font-size:10px}
   .stats{padding:6px 8px}.stats dd{font-size:12px}.stats .unit{margin-top:3px}.stats .share{margin-top:4px}
+  .stats dl{gap:1px 8px}.stats dd{line-height:1.15}.mode-bar{margin-top:3px;font-size:9px;line-height:1.25}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .mine.calm *{transition:none!important;animation:none!important}

@@ -56,7 +56,7 @@ export function ActionBar({ lang, real, pot, canWithdraw, canBet, streak, hint, 
   const capped = streak >= MAX_STREAK;
   return <div className={`actions${hint ? ' hint' : ''}`} role="group" aria-label={pick(lang, ['ポットの使い道', 'What to do with the pot'])}>
     <button className="withdraw" data-testid="withdraw" disabled={!canWithdraw} onClick={onWithdraw}>
-      <b>{real ? pick(lang, ['記録して引き出す', 'Withdraw (record)']) : pick(lang, ['引き出す', 'Withdraw'])}</b>
+      <b>{pick(lang, ['引き出す', 'Withdraw'])}</b>
       <small>{real ? pick(lang, [`${pot} RF を記録`, `Record ${pot} RF`]) : pick(lang, [`${pot} を安全な残高へ`, `Bank ${pot} safely`])}</small>
     </button>
     <button className="bet" data-testid="bet" disabled={!canBet} onClick={onBet} aria-describedby="odds-line">

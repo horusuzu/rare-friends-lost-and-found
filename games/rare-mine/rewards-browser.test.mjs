@@ -9,7 +9,7 @@ import { routeRewards } from './rewards-fixture.mjs';
 const launch = chromium.launch.bind(chromium);
 if (process.env.MINE_CHROMIUM) chromium.launch = o => launch({ ...o, executablePath: process.env.MINE_CHROMIUM });
 const sizes = process.env.MINE_SIZE ? JSON.parse(process.env.MINE_SIZE) : [[320, 568], [390, 844], [844, 390], [960, 640], [1100, 900]];
-const shots = new Set([390, 1100]);
+const shots = new Set(process.env.MINE_SHOT_ALL ? sizes.map(([w]) => w) : [390, 1100]);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const REAL_NOTE = '表示中のRFは本物の報酬（読み取りのみ）';
 const BET_NOTE = '賭け・バーンはシミュレーション。本物のRFは動かず、燃えません';
@@ -149,7 +149,8 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
 
     const wide = await game.locator('.mine').evaluate(e => e.scrollWidth > e.clientWidth + 1 ? [...e.querySelectorAll('*')].filter(n => n.getBoundingClientRect().right > e.clientWidth + 1).map(n => n.className || n.tagName).slice(0, 8) : null);
     assert.equal(wide, null, `no horizontal overflow: ${JSON.stringify(wide)}`);
-    const tall = await game.locator('.mine').evaluate(e => [...e.children].filter(n => n.getBoundingClientRect().bottom > e.clientHeight + 1).map(n => n.className || n.tagName));
+    const tall = await game.locator('.mine').evaluate(e => [...e.children].filter(n => n.getBoundingClientRect().bottom > e.clientHeight + 1).map(n => `${n.className || n.tagName} ${Math.round(n.getBoundingClientRect().bottom)}>${e.clientHeight}`));
+    if (tall.length) await page.screenshot({ path: `./artifacts/mine2-overflow-${width}.png` });
     assert.deepEqual(tall, [], 'nothing falls below the frame');
     assert.equal(await game.locator('body').evaluate(e => e.scrollWidth > innerWidth || e.scrollHeight > innerHeight + 1), false, 'no page overflow');
 
