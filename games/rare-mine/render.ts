@@ -37,13 +37,17 @@ function drawBackdrop(): HTMLCanvasElement {
   for (let x = 0; x < SCENE_W; x++) for (let y = FLOOR_Y; y < SCENE_H; y++) if (hash2(x, y, 9) > 0.9) { c.fillStyle = P.rockLo; c.fillRect(x, y, 1, 1); }
   for (let x = 2; x < SCENE_W; x += 8) { c.fillStyle = P.woodLo; c.fillRect(x, FLOOR_Y + 2, 5, 3); }
   c.fillStyle = P.railHi; c.fillRect(0, FLOOR_Y + 1, SCENE_W, 1); c.fillStyle = P.rail; c.fillRect(0, FLOOR_Y + 4, SCENE_W, 1);
-  // Timber supports: two posts and a cap beam.
+  // Timber supports: two posts running up the shaft, a cap beam and (on tall screens) upper beams and braces.
+  const top = -CEILING + 10;
   for (const px of [40, 170]) {
-    c.fillStyle = P.woodLo; c.fillRect(px, 14, 7, FLOOR_Y - 14);
-    c.fillStyle = P.wood; c.fillRect(px + 1, 14, 5, FLOOR_Y - 14);
-    c.fillStyle = P.woodHi; c.fillRect(px + 1, 14, 1, FLOOR_Y - 14);
+    c.fillStyle = P.woodLo; c.fillRect(px, top, 7, FLOOR_Y - top);
+    c.fillStyle = P.wood; c.fillRect(px + 1, top, 5, FLOOR_Y - top);
+    c.fillStyle = P.woodHi; c.fillRect(px + 1, top, 1, FLOOR_Y - top);
   }
-  c.fillStyle = P.woodLo; c.fillRect(30, 8, 156, 8); c.fillStyle = P.wood; c.fillRect(30, 9, 156, 5); c.fillStyle = P.woodHi; c.fillRect(30, 9, 156, 1);
+  for (const by of [8, -48, -96]) { c.fillStyle = P.woodLo; c.fillRect(30, by, 156, 8); c.fillStyle = P.wood; c.fillRect(30, by + 1, 156, 5); c.fillStyle = P.woodHi; c.fillRect(30, by + 1, 156, 1); }
+  for (let i = 0; i < 40; i++) {
+    c.fillStyle = P.woodLo; c.fillRect(47 + i * 3, -40 + i, 4, 3); c.fillStyle = P.wood; c.fillRect(47 + i * 3, -40 + i, 3, 2);
+  }
   c.fillStyle = P.ink; c.fillRect(117, 16, 1, 6);
   drawCeiling(c);
   return (backdrop = el);
