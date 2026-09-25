@@ -25,6 +25,8 @@ export const COIN_FRAMES: readonly Sprite[] = [
 export const COIN_EDGE = sprite(['.hhhhh.', 'oyyyyyo', '.ddddd.'], { o: P.goldDeep, y: P.gold, h: P.goldHi, d: P.goldLo });
 /** A coin in the burning pile: glowing ember colors. */
 export const COIN_EDGE_BURN = sprite(['.fffff.', 'reeeeer', '.rrrrr.'], { f: '#ffd27a', e: '#ff7a2e', r: '#a8281a' });
+/** A charred coin: the burnt pile crumbling to ash. */
+export const COIN_EDGE_CHAR = sprite(['.ddddd.', 'kccccck', '.kkkkk.'], { d: '#5a4238', c: '#3a2c26', k: '#1a1310' });
 export const GEM = sprite(['...o...', '..oho..', '.ohhgo.', 'ohggglo', '.ogglo.', '..olo..', '...o...'],
   { o: P.gemLo, h: P.gemHi, g: P.gem, l: P.gemLo });
 /** Pickaxe, head up-right, handle down-left; the grip is at the bottom-left corner. */

@@ -4,9 +4,13 @@
  */
 import { ROCK_HP } from './economy.ts';
 import type { MineState } from './game.ts';
-import { COIN_EDGE, COIN_EDGE_BURN, LANTERN, PICK, PALETTE as P, drawFriend, drawSprite, hash2, jarLevel, pileCount, type FriendRows } from './art.ts';
+import { COIN_EDGE, COIN_EDGE_BURN, COIN_EDGE_CHAR, LANTERN, PICK, PALETTE as P, drawFriend, drawSprite, hash2, jarLevel, pileCount, type FriendRows } from './art.ts';
 import { createParticles, type Cue, type Particles } from './particles.ts';
 import { CART, FLOOR_Y, IMPACT, JAR, ROCK_X, SCENE_H, SCENE_H_MAX, SCENE_W } from './layout.ts';
+import type { FxFrame } from './fx-show.ts';
+import { drawReach } from './fx-reach.ts';
+import { drawWinBack, drawWinFront, drawWinScreen } from './fx-win.ts';
+import { drawLoseFront, drawLoseScreen, loseShake } from './fx-lose.ts';
 
 export { SCENE_W, SCENE_H, sceneHeight } from './layout.ts';
 const CEILING = SCENE_H_MAX - SCENE_H;
@@ -17,8 +21,8 @@ const HEAP = [5, 4, 4, 3, 2, 1];
 export interface Scene {
   /** Forget queued effects (a new or reloaded mine starts with a quiet scene). */
   reset(s: MineState): void;
-  /** Draw one frame on a canvas `h` rows tall (160–224); returns the sound cues due this frame. */
-  draw(c: CanvasRenderingContext2D, s: MineState, rows: FriendRows | null, now: number, reduced: boolean, h?: number): Cue[];
+  /** Draw one frame on a canvas `h` rows tall (160–272) with the bet show's frame; returns the sound cues due this frame. */
+  draw(c: CanvasRenderingContext2D, s: MineState, rows: FriendRows | null, now: number, reduced: boolean, h?: number, fx?: FxFrame | null): Cue[];
 }
 
 let backdrop: HTMLCanvasElement | null = null;
@@ -137,8 +141,8 @@ function drawMiner(c: CanvasRenderingContext2D, rows: FriendRows | null, swingT:
   void now;
 }
 
-function drawPile(c: CanvasRenderingContext2D, coins: number, burning = false): void {
-  const edge = burning ? COIN_EDGE_BURN : COIN_EDGE;
+function drawPile(c: CanvasRenderingContext2D, coins: number, look: 'gold' | 'burn' | 'char' = 'gold'): void {
+  const edge = look === 'burn' ? COIN_EDGE_BURN : look === 'char' ? COIN_EDGE_CHAR : COIN_EDGE;
   let n = pileCount(coins), row = 0;
   const cx = CART.x + CART.w / 2;
   while (n > 0 && row < MOUND.length) {
@@ -190,27 +194,35 @@ export function createScene(): Scene {
   let swingAt = -10, rollGlow = 0;
   return {
     reset(s) { parts.reset(s); swingAt = -10; },
-    draw(c, s, rows, now, reduced, h = SCENE_H) {
+    draw(c, s, rows, now, reduced, h = SCENE_H, fx = null) {
       const top = Math.max(0, h - SCENE_H);
-      const cues = parts.intake(s, now, reduced);
+      const cues = parts.intake(s, now, reduced, top);
       if (cues.some(q => q.k === 'tock')) swingAt = now;
       const view = parts.step(s, now, reduced);
+      const win = fx && (fx.kind === 'win' || fx.kind === 'fever') ? fx : null, lose = fx?.kind === 'lose' ? fx : null;
       c.imageSmoothingEnabled = false;
       c.save();
       c.translate(0, top);
       if (!reduced && view.shake > 0) c.translate(Math.round((hash2(Math.floor(now * 60), 1) - 0.5) * 2 * view.shake), 0);
+      if (lose) c.translate(loseShake(lose), 0);
       c.drawImage(drawBackdrop(), 0, -CEILING);
       drawRock(c, s, now, reduced, !reduced && now - swingAt > 0.15 && now - swingAt < 0.2 ? 1 : 0);
+      if (win) drawWinBack(c, win, h, top);
       drawJar(c, view.jar, now, reduced);
       drawPile(c, view.pile);
-      if (view.burning > 0) drawPile(c, view.burning, true);
+      if (view.burning > 0) drawPile(c, view.burning, view.burnLook);
       drawCart(c);
       drawMiner(c, rows, now - swingAt, now, reduced);
       rollGlow = s.phase === 'roll' && !reduced ? 0.08 + 0.06 * Math.sin(now * 18) : 0;
       parts.draw(c, now);
       drawLight(c, now, reduced, rollGlow, top);
+      if (lose) drawLoseFront(c, lose, h, top);
+      if (win) drawWinFront(c, win, h, top);
       if (view.flash > 0) { c.fillStyle = `${view.flashColor}${Math.round(view.flash * 255).toString(16).padStart(2, '0')}`; c.fillRect(0, -top, SCENE_W, h); }
       c.restore();
+      if (fx?.kind === 'reach') drawReach(c, fx, rows, h);
+      if (win) drawWinScreen(c, win, win.plan, rows, h);
+      if (lose) drawLoseScreen(c, lose, lose.plan, rows, h);
       return [...cues, ...view.cues];
     },
   };

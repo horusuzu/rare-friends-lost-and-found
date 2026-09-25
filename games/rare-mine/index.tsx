@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { GameComponentProps } from '@rarefriends/friendsdk/runtime';
 import { createFriendReader, createGenesisReader, spriteFrame, type GenerationSprites } from '@rarefriends/friendsdk/sprites';
-import { CHOICE_HINT, COMBO_MAX, MAX_STREAK, ROLL_TIME, ROLL_TIME_REDUCED } from './economy.ts';
-import { askBet, cancelBet, comboLevel, confirmBet, newGame, setSound, skipRoll, tap, tick, withdraw, type MineState } from './game.ts';
+import { CHOICE_HINT, COMBO_MAX, MAX_STREAK } from './economy.ts';
+import { askBet, betOutcome, cancelBet, comboLevel, confirmBet, newGame, setSound, skipRoll, tap, tick, withdraw, type MineState } from './game.ts';
 import { loadSave, serializeSave, type SaveData } from './save.ts';
 import { RF, decideMode, fmtRF } from './feed.ts';
 import { canRealBet, newLedger, realPot } from './real.ts';
@@ -11,8 +11,12 @@ import { useRealMine } from './use-real-mine.ts';
 import { SCENE_H, SCENE_W, createScene, sceneHeight } from './render.ts';
 import type { FriendRows } from './art.ts';
 import { createMineAudio, type MineAudio } from './sound.ts';
+import { audibleCues } from './sound-fx.ts';
+import { reachPlan, suspenseFor } from './reach.ts';
+import { createShow, type FxFrame } from './fx-show.ts';
+import { LoseOverlay, ReachOverlay, WinOverlay } from './fx-panels.tsx';
 import type { Cue } from './particles.ts';
-import { ActionBar, BET_SIM_NOTE, ComboMeter, ConfirmPanel, Odometer, ResultBanner, RollPanel, SIM_NOTE, StatsPanel, coinText, fmt, pick, type Lang } from './panels.tsx';
+import { ActionBar, BET_SIM_NOTE, ComboMeter, ConfirmPanel, Odometer, SIM_NOTE, StatsPanel, coinText, fmt, pick, type Lang } from './panels.tsx';
 import { ModeBar, RealHud, StageNote } from './real-panels.tsx';
 import { Portrait, Title } from './title.tsx';
 import { PRACTICE_NOTE, REAL_STATS_NOTE, announcement, practiceRows, realRows, type BannerInfo, type Toast } from './view.ts';
@@ -27,6 +31,12 @@ const EMPTY_SAVE: SaveData = Object.freeze({ practice: null, real: null, sound: 
 /** Re-render React only when something visible changed. */
 const signature = (s: MineState) => `${s.mode}|${s.fxId}|${s.phase}|${comboLevel(s)}|${s.saveTick}|${s.sound}|${s.streak}`;
 const rfText = (wei: bigint) => `${fmtRF(wei)} RF`;
+/** The last bet's result for the win / burn overlays; `count` rolls the pot text from the stake (0) to the doubled pot (1). */
+interface ResultInfo extends BannerInfo { readonly count: (k: number) => string }
+/** What the overlays need from the show's current frame (React re-renders only when this changes). */
+interface FxView { readonly id: number; readonly kind: FxFrame['kind']; readonly stage: string; readonly tier: FxFrame['plan']['tier']; readonly winTier: FxFrame['winTier']; readonly tease: boolean }
+const fxViewOf = (f: FxFrame | null): FxView | null => f && { id: f.id, kind: f.kind, stage: f.stage, tier: f.plan.tier, winTier: f.winTier, tease: f.plan.tease };
+const fxKeyOf = (f: FxFrame | null): string => f ? `${f.id}|${f.kind}|${f.stage}` : '';
 
 export default function RareMine(props: GameComponentProps) {
   return <Mine key={`${props.collection ?? 'generations'}:${props.friendId}`} {...props} />;
@@ -44,11 +54,12 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
   const [reduced, setReduced] = useState(() => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [saves, setSaves] = useState(0), [saveError, setSaveError] = useState(false);
   const [banner, setBanner] = useState<BannerInfo | null>(null), [toast, setToast] = useState<Toast | null>(null);
+  const [result, setResult] = useState<ResultInfo | null>(null), [fxView, setFxView] = useState<FxView | null>(null);
   const [sharing, setSharing] = useState(false), [shareError, setShareError] = useState(false);
   const [, setHud] = useState(0);
   const game = useRef<MineState | null>(null), canvas = useRef<HTMLCanvasElement>(null), scene = useRef(createScene());
   const keep = useRef<SaveData>(EMPTY_SAVE);
-  const audio = useRef<MineAudio | null>(null), stopRoll = useRef<(() => void) | null>(null), sig = useRef(''), handledSave = useRef(0);
+  const audio = useRef<MineAudio | null>(null), show = useRef(createShow()), fxKey = useRef(''), sig = useRef(''), handledSave = useRef(0);
   const reducedRef = useRef(reduced); reducedRef.current = reduced;
   const wrap = useRef<HTMLDivElement>(null), [sceneH, setSceneH] = useState(SCENE_H);
   const sceneHRef = useRef(sceneH); sceneHRef.current = sceneH;
@@ -103,7 +114,6 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
   function play(cues: readonly Cue[], s: MineState) {
     for (const q of cues) {
       if (s.mode === 'practice' && (q.k === 'vein' || q.k === 'gem')) setToast({ id: Date.now(), text: q.k === 'gem' ? [`宝石！ +${q.n}`, `GEM! +${q.n}`] : [`金の鉱脈！ +${q.n}`, `Gold vein! +${q.n}`] });
-      if (q.k === 'win' || q.k === 'burn') { stopRoll.current?.(); stopRoll.current = null; }
     }
     const a = audio.current;
     if (!a || !s.sound) return;
@@ -134,7 +144,12 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
         if (key !== hudKey && now - hudAt >= HUD_S) { hudKey = key; hudAt = now; setHud(n => n + 1); }
       }
       const s = game.current, c = canvas.current?.getContext('2d');
-      if (s && c) play(scene.current.draw(c, s, sprites ? friendRowsOf(sprites) : null, now, reducedRef.current, sceneHRef.current), s);
+      // The bet show: the reach follows the engine's suspense clock; celebrations advance only while the game is active.
+      const shown = show.current.step(s, activeRef.current ? dt : 0, reducedRef.current);
+      if (s && audio.current) for (const q of audibleCues(shown.cues, s.sound)) audio.current.cue(q);
+      const key = fxKeyOf(shown.frame);
+      if (key !== fxKey.current) { fxKey.current = key; setFxView(fxViewOf(shown.frame)); }
+      if (s && c) play(scene.current.draw(c, s, sprites ? friendRowsOf(sprites) : null, now, reducedRef.current, sceneHRef.current, shown.frame), s);
       frame = requestAnimationFrame(loop);
     }
     frame = requestAnimationFrame(loop);
@@ -161,9 +176,12 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
     const last = view?.last;
     if (!last) return;
     const roll = realRef.current.rolling.current;
-    setBanner(view.mode === 'real' && roll
-      ? { id: last.id, win: roll.win, stake: rfText(roll.stake), pot: rfText(roll.pot), streak: roll.ledger.streak, simulated: true }
-      : { id: last.id, win: last.win, stake: fmt(last.stake), pot: fmt(last.pot), streak: last.streak, simulated: false });
+    const info: ResultInfo = view.mode === 'real' && roll
+      ? { id: last.id, win: roll.win, stake: rfText(roll.stake), pot: rfText(roll.pot), streak: roll.ledger.streak, simulated: true,
+        count: k => rfText(roll.stake + roll.stake * BigInt(Math.round(k * 1000)) / 1000n) }
+      : { id: last.id, win: last.win, stake: fmt(last.stake), pot: fmt(last.pot), streak: last.streak, simulated: false,
+        count: k => fmt(last.stake + (last.pot - last.stake) * k) };
+    setBanner(info); setResult(info);
     const t = setTimeout(() => setBanner(null), BANNER_MS);
     return () => clearTimeout(t);
   }, [lastId]);
@@ -189,15 +207,25 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
   const doBet = () => act(s => s.phase === 'confirm' ? cancelBet(s) : s.mode === 'real' ? askReal(s) : askBet(s));
   const doAsk = () => act(s => s.mode === 'real' ? askReal(s) : askBet(s));
   function doConfirm() {
-    const suspense = reducedRef.current ? ROLL_TIME_REDUCED : ROLL_TIME;
-    if (!isReal()) { act(s => confirmBet(s, suspense)); return; }
-    act(s => realRef.current.confirm(s, suspense));
-    void persist();
+    const s = game.current, l = realRef.current.ledger.current;
+    if (!s || s.phase !== 'confirm' || !activeRef.current) return;
+    // The reach is planned from this bet's seed and the outcome the engine will draw from it; it only sets the suspense.
+    const seed = s.mode === 'real' ? l?.betSeed : s.betSeed;
+    if (seed === undefined) return;
+    const reduced = reducedRef.current, planned = reachPlan(seed, betOutcome(seed)[0]);
+    audio.current?.hush();
+    act(cur => cur.mode === 'real' ? realRef.current.confirm(cur, suspenseFor(planned, reduced)) : confirmBet(cur, suspenseFor(planned, reduced)));
+    const rolled = game.current?.roll;
+    if (game.current?.phase === 'roll' && rolled) show.current.begin(rolled.win === planned.win ? planned : reachPlan(seed, rolled.win), reduced);
+    if (s.mode === 'real') void persist();
   }
   const doCancel = () => act(cancelBet);
   const toggleSound = () => {
     const s = game.current;
-    if (s) { ensureAudio(); commit(setSound(s, !s.sound)); }
+    if (!s) return;
+    ensureAudio();
+    if (s.sound) audio.current?.hush();
+    commit(setSound(s, !s.sound));
   };
   const handlers = useRef({ strike, doWithdraw, doAsk, doConfirm, doCancel, toggleSound, pauseNow });
   handlers.current = { strike, doWithdraw, doAsk, doConfirm, doCancel, toggleSound, pauseNow };
@@ -226,7 +254,9 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
     window.addEventListener('blur', blur); document.addEventListener('visibilitychange', visibility);
     return () => { window.removeEventListener('keydown', down); window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', visibility); };
   }, []);
-  useEffect(() => () => { stopRoll.current?.(); audio.current?.close(); audio.current = null; }, []);
+  useEffect(() => () => { audio.current?.close(); audio.current = null; }, []);
+  // Pause, page hide and blur stop every sound at once (fever loops included); the show's clocks freeze with the game.
+  useEffect(() => { if (!active) audio.current?.hush(); }, [active]);
   // Portrait screens get a taller canvas (more rock ceiling) instead of empty space around a letterboxed stage.
   useEffect(() => {
     const el = wrap.current;
@@ -238,9 +268,9 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
 
   function begin(state: MineState) {
     ensureAudio();
-    scene.current.reset(state);
+    scene.current.reset(state); show.current.reset(state); audio.current?.hush();
     game.current = state; handledSave.current = state.saveTick; sig.current = '';
-    commit(state); setManualPause(false); setBanner(null);
+    commit(state); setManualPause(false); setBanner(null); setResult(null);
   }
   function startPractice() { begin(keep.current.practice ?? newGame(token, newSeed(), game.current?.sound ?? keep.current.sound)); }
   function startReal() {
@@ -254,7 +284,7 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
     if ((e.target as HTMLElement).closest('button') || !activeRef.current) return;
     e.preventDefault(); strike();
   };
-  const s = view;
+  const s = view, fx = fxView;
   const real = s?.mode === 'real';
   const ledger = real ? realMine.ledger.current : null, shown = realMine.shown.current, rolling = realMine.rolling.current;
   const potWei = ledger && shown !== null ? (s?.phase === 'roll' && rolling ? rolling.stake : realPot(ledger, shown)) : 0n;
@@ -288,7 +318,10 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
         {started && <button disabled={paused} aria-label={tt('一時停止', 'Pause')} onClick={pauseNow} data-testid="pause">Ⅱ</button>}
       </div>
     </header>
-    <div className="stage-wrap" ref={wrap}><div className="stage" style={{ ['--ar' as string]: SCENE_W / sceneH }} data-testid="screen" data-started={String(started)}
+    <div className="stage-wrap" ref={wrap}><div className={`stage${fx?.kind === 'reach' ? ' fx-reach' : ''}${active ? '' : ' halted'}`} style={{ ['--ar' as string]: SCENE_W / sceneH }}
+      data-testid="screen" data-started={String(started)}
+      data-fx={fx?.kind ?? ''} data-fx-stage={fx?.stage ?? ''} data-reach-tier={fx ? fx.tier : ''} data-win-tier={fx && fx.kind !== 'reach' && fx.kind !== 'lose' ? fx.winTier : ''}
+      data-tease={fx ? String(fx.tease) : ''}
       data-mode={s?.mode ?? 'title'} data-decision={decision.mode === 'practice' ? `practice:${decision.reason}` : decision.mode}
       data-reads={reader.reads} data-failures={reader.failures} data-rate={reader.feed.rate?.toString() ?? ''} {...realData}
       data-phase={s?.phase ?? 'title'} data-pot={s?.pot ?? 0} data-safe={s?.safe ?? 0}
@@ -309,10 +342,13 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
       {s && <StageNote lang={lang} real={real} />}
       {hint && active && <p className="nudge">{tt('ポットがたまった！ 引き出す？ 倍かけ？', 'Nice pile! Bank it, or double it?')}</p>}
       {toast && active && <p className="toast" aria-hidden="true">{pick(lang, toast.text)}</p>}
-      {banner && s?.phase === 'mine' && <ResultBanner lang={lang} {...banner} />}
+      {result && fx && s?.phase === 'mine' && (fx.kind === 'win' || fx.kind === 'fever') && fx.stage === 'party' && <WinOverlay key={fx.id} lang={lang}
+        tier={fx.winTier} streak={result.streak} pot={result.pot} count={result.count} simulated={result.simulated} reduced={reduced} clock={show.current.clock} />}
+      {result && fx && s?.phase === 'mine' && fx.kind === 'lose' && fx.stage === 'burn' && <LoseOverlay key={fx.id} lang={lang} stake={result.stake} simulated={result.simulated} />}
       {s?.phase === 'confirm' && <ConfirmPanel lang={lang} stake={stakeText} win={real ? rfText(potWei * 2n) : fmt((s?.pot ?? 0) * 2)} live={real}
         note={real ? BET_SIM_NOTE : undefined} onConfirm={doConfirm} onCancel={doCancel} />}
-      {s?.phase === 'roll' && <RollPanel lang={lang} stake={real && rolling ? rfText(rolling.stake) : fmt(s.roll?.stake ?? 0)} reduced={reduced} onSkip={() => act(skipRoll)} />}
+      {s?.phase === 'roll' && <ReachOverlay lang={lang} stage={fx?.kind === 'reach' ? fx.stage : 'spin'} tier={fx?.tier ?? 0}
+        stake={real && rolling ? rfText(rolling.stake) : fmt(s.roll?.stake ?? 0)} onSkip={() => act(skipRoll)} />}
       {(!started || error) && <Title lang={lang} label={label} rows={friendRows} ready={ready} error={error} loadError={loadError} paused={paused}
         decision={decision} last={reader.last} rate={reader.feed.rate} busy={rewards.busy} practice={saved.practice} real={saved.real}
         onRetryFriend={() => setAttempt(v => v + 1)} onRetrySave={() => { setLoadError(false); setAttempt(v => v + 1); }}

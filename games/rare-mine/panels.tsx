@@ -1,4 +1,4 @@
-/** DOM overlays and panels: odometers, combo meter, Withdraw / Bet bar, odds dialog, suspense, result banner and stats. */
+/** DOM overlays and panels: odometers, combo meter, Withdraw / Bet bar, odds dialog and stats (the bet show is in fx-panels.tsx). */
 import { useEffect, useRef, type ReactNode } from 'react';
 import { MAX_STREAK, PAYOUT, WIN_CHANCE } from './economy.ts';
 import { multiplier } from './game.ts';
@@ -96,24 +96,6 @@ export function ConfirmPanel({ lang, stake, win, live = false, note, onConfirm, 
       <button className="go" data-testid="confirm-bet" onClick={onConfirm}>{pick(lang, ['かける', 'Bet it all'])} <kbd>Y</kbd></button>
       <button className="stop" data-testid="cancel-bet" onClick={onCancel}>{pick(lang, ['やめる', 'Not now'])} <kbd>N</kbd></button>
     </div>
-  </div>;
-}
-
-export function RollPanel({ lang, stake, reduced, onSkip }: { lang: Lang; stake: string; reduced: boolean; onSkip: () => void }) {
-  return <button className="dialog roll" data-testid="roll" onClick={onSkip} aria-label={pick(lang, ['結果を見る', 'Reveal the result'])}>
-    <span className={`flip${reduced ? ' still' : ''}`} aria-hidden="true"><i>RF</i><i>🔥</i></span>
-    <b>{pick(lang, [`勝率${WIN_PCT}%…`, `${WIN_PCT}% to win…`])}</b>
-    <small>{pick(lang, [`賭け金 ${stake} · タップで結果へ`, `Stake ${stake} · tap to reveal`])}</small>
-  </button>;
-}
-
-export interface BannerProps { readonly lang: Lang; readonly win: boolean; readonly stake: string; readonly pot: string; readonly streak: number; readonly simulated?: boolean }
-export function ResultBanner({ lang, win, stake, pot, streak, simulated = false }: BannerProps) {
-  return <div className={`banner ${win ? 'win' : 'lose'}`} aria-hidden="true" data-testid="result">
-    {win
-      ? <><b>{pick(lang, [`×${PAYOUT} 勝ち！`, `×${PAYOUT} WIN!`])}</b><small>{pick(lang, [`ポット ${pot} · ${streak}連勝（×${multiplier(streak)}）`, `Pot ${pot} · ${streak} in a row (×${multiplier(streak)})`])}</small></>
-      : <><b>🔥 {stake} burned</b><small>{pick(lang, ['ポットは全額バーンされました', 'The whole pot burned'])}</small></>}
-    {simulated && <small>{pick(lang, ['（シミュレーション）', '(simulated)'])}</small>}
   </div>;
 }
 

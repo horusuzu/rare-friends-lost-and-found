@@ -1,0 +1,70 @@
+/* The bet show's DOM layers. Motion is transform/opacity only; flashing is 2 Hz or slower. `.mine.calm` (reduced
+   motion) switches every animation off, and each element's resting state is its readable, static look. */
+.stage.fx-reach .hud{opacity:.3;transition:opacity var(--fast)}
+/* Paused: the show freezes where it is (the canvas clock stops with the game; CSS animations stop here). */
+.stage.halted .reach-fx *,.stage.halted .win-fx *,.stage.halted .lose-fx *{animation-play-state:paused!important}
+/* The streak counter next to the pot. */
+.pot em{display:inline-block;padding:0 .8cqw;border-radius:99px;background:linear-gradient(#ff5a3a,#b8120c);color:#fff;text-shadow:none}
+
+.reach-fx{position:absolute;inset:0;display:block;margin:0;padding:0;border:0;border-radius:8px;background:transparent;color:#fff;cursor:pointer;font:inherit}
+.reach-fx:focus-visible{outline:3px solid var(--gold);outline-offset:-4px}
+.reach-edge{position:absolute;inset:0;border-radius:8px;opacity:0;pointer-events:none;
+  box-shadow:inset 0 0 0 .9cqw var(--edge,#ff3b3b),inset 0 0 5cqw var(--edge,#ff3b3b)}
+.reach-fx.hot{--edge:#ffcf6e}.reach-fx.super{--edge:#ff5ad2}
+.reach-fx:not(.spin) .reach-edge{opacity:1;animation:edge-blink .5s steps(1,end) infinite}
+.reach-call{position:absolute;left:50%;top:57%;transform:translateX(-50%);white-space:nowrap;pointer-events:none;
+  font:900 10cqw/1 var(--display);letter-spacing:.3cqw;color:#fff;-webkit-text-stroke:.4cqw #9a0016;paint-order:stroke fill;
+  filter:drop-shadow(0 .6cqw 0 #3a0008) drop-shadow(0 0 1.6cqw #ff3b3bcc);
+  animation:call-in .35s var(--ease) both,call-pulse .5s steps(1,end) .35s infinite}
+.reach-fx.hot .reach-call{color:transparent;background:linear-gradient(#fffbe0,#ffe066 45%,#f5a300 70%,#b07a1c);-webkit-background-clip:text;background-clip:text;
+  -webkit-text-stroke:.4cqw #5a1a00;filter:drop-shadow(0 .6cqw 0 #3a1400) drop-shadow(0 0 2cqw #ffcf6ecc);font-size:11cqw}
+.reach-fx.super .reach-call{color:transparent;-webkit-background-clip:text;background-clip:text;font-size:11.5cqw;-webkit-text-stroke:.4cqw #2a0036;
+  background:linear-gradient(90deg,#ff4d6d,#ffb13b,#fff1a8,#5be37d,#4fd8cc,#6c8cff,#c77dff);filter:drop-shadow(0 .6cqw 0 #1a0024) drop-shadow(0 0 2.4cqw #ff5ad2cc)}
+.reach-fx.tease .reach-call{animation:tease-shake .16s steps(2,end) infinite}
+.reach-line{position:absolute;left:50%;bottom:12cqw;transform:translateX(-50%);max-width:94%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  padding:.4cqw 1.8cqw;border-radius:99px;background:#000b;color:var(--cream);font-size:max(2.2cqw,10px);pointer-events:none}
+
+.win-fx,.lose-fx{position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:8px}
+.edge-lights i{position:absolute;inset:0;border-radius:8px;opacity:0;box-shadow:inset 0 0 0 1cqw var(--a),inset 0 0 6cqw var(--a);animation:strobe 1s steps(1,end) infinite}
+.edge-lights i+i{--a:var(--b)!important;animation-delay:-.5s}
+.win-fx{--a:#fff1a8;--b:#f5c542}.win-fx.tier-1{--a:#ffb13b;--b:#fff1a8}.win-fx.tier-2{--a:#ff5ad2;--b:#4fd8cc}.win-fx.tier-3{--a:#6c8cff;--b:#ffe066}
+.win-card{position:absolute;left:50%;top:20%;display:flex;flex-direction:column;align-items:center;gap:.5cqw;min-width:58cqw;max-width:94%;padding:1.8cqw 4cqw 1.6cqw;
+  transform:translateX(-50%);overflow:hidden;border-radius:2.4cqw;text-align:center;color:var(--ink);
+  background:radial-gradient(ellipse at 50% 0,#fffbe6,#ffe066 45%,#f5a300);box-shadow:inset 0 0 0 .5cqw #fff8,0 0 0 .6cqw #7a4f12,0 0 6cqw #ffcf6e,0 1.4cqw 3cqw #000c;
+  animation:jackpot-in .5s cubic-bezier(.2,1.6,.4,1) both}
+.win-fx.tier-2 .win-card,.win-fx.tier-3 .win-card{background:linear-gradient(115deg,#ff9ab0,#ffe08a 25%,#b8ffb0 45%,#9ff3ff 65%,#c9b0ff 85%,#ffb0e0);
+  box-shadow:inset 0 0 0 .5cqw #fffa,0 0 0 .6cqw #3a1a5a,0 0 7cqw #ff5ad2,0 1.4cqw 3cqw #000c}
+.win-card .shine{position:absolute;top:-20%;bottom:-20%;left:0;width:30%;background:linear-gradient(90deg,#fff0,#fffc,#fff0);transform:translateX(-150%) skewX(-18deg);
+  animation:shine 1.3s var(--ease) .35s infinite}
+.win-title{position:relative;font:900 11cqw/1 var(--display);letter-spacing:.4cqw;color:#c0101c;-webkit-text-stroke:.3cqw #fff;paint-order:stroke fill;
+  filter:drop-shadow(0 .5cqw 0 #5a0a00)}
+.win-fx.tier-2 .win-title,.win-fx.tier-3 .win-title{color:#5a0a8a;filter:drop-shadow(0 .5cqw 0 #1a0024)}
+.win-fx.tier-3 .win-title{font-size:13cqw}
+.win-mult{position:relative;font:900 4.4cqw/1 var(--display);letter-spacing:.5cqw}
+.win-count{position:relative;display:block;min-width:6ch;padding:.3cqw 1.4cqw;border-radius:1cqw;background:#140f0cd8;color:var(--gold-hi);
+  font:800 5cqw/1.15 ui-monospace,'SF Mono',Menlo,monospace;font-variant-numeric:tabular-nums}
+.win-card small{position:relative;font-weight:800;font-size:max(2.4cqw,10px)}
+.streak-badge{position:absolute;right:2cqw;top:22cqw;padding:.8cqw 2cqw;border-radius:99px;background:linear-gradient(#ff5a3a,#b8120c);color:#fff;
+  font:900 max(3.4cqw,12px)/1 var(--display);letter-spacing:.2cqw;box-shadow:0 0 0 .4cqw #fff1a8,0 .8cqw 1.6cqw #000a;transform:rotate(-8deg);
+  animation:badge-in .4s cubic-bezier(.2,1.6,.4,1) .25s both}
+.win-fx.tier-2 .streak-badge,.win-fx.tier-3 .streak-badge{background:linear-gradient(#c77dff,#5a0a8a)}
+
+.lose-card{position:absolute;left:50%;top:24%;display:flex;flex-direction:column;align-items:center;gap:.6cqw;max-width:94%;padding:1.8cqw 4.4cqw;
+  transform:translateX(-50%);border-radius:2cqw;text-align:center;color:#fff4e6;background:linear-gradient(#5a1208f0,#1a0604f0);
+  box-shadow:inset 0 0 0 .4cqw #ff7a2e88,0 0 5cqw #ff5a1f66,0 1.4cqw 3cqw #000c;animation:lose-in .45s var(--ease) .3s both,smoke-out .6s ease-in 1.6s forwards}
+.lose-card b{font:900 7cqw/1.05 var(--display);letter-spacing:.2cqw;white-space:nowrap;color:var(--flame);filter:drop-shadow(0 .5cqw 0 #3a0800)}
+.lose-card small{font-size:max(2.4cqw,10px);color:#ffd9c2}
+
+@keyframes edge-blink{0%{opacity:1}50%{opacity:.2}}
+@keyframes call-in{from{opacity:0;transform:translateX(-50%) scale(2.1)}to{opacity:1;transform:translateX(-50%) scale(1)}}
+@keyframes call-pulse{0%{opacity:1}50%{opacity:.6}}
+@keyframes tease-shake{0%{transform:translate(-51%,0)}50%{transform:translate(-49%,-1px)}}
+@keyframes strobe{0%{opacity:1}50%{opacity:0}}
+@keyframes jackpot-in{from{opacity:0;transform:translateX(-50%) scale(.3) rotate(-6deg)}to{opacity:1;transform:translateX(-50%) scale(1)}}
+@keyframes shine{from{transform:translateX(-150%) skewX(-18deg)}60%,to{transform:translateX(420%) skewX(-18deg)}}
+@keyframes badge-in{from{opacity:0;transform:rotate(-8deg) scale(2.2)}to{opacity:1;transform:rotate(-8deg) scale(1)}}
+@keyframes lose-in{from{opacity:0;transform:translate(-50%,-2cqw) scale(1.15)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+@keyframes smoke-out{to{opacity:.15;transform:translate(-50%,-3cqw) scale(.96)}}
+/* Reduced motion: the global rule in style.css removes every animation; keep the static cards and borders readable. */
+.mine.calm .reach-edge{opacity:1}
+.mine.calm .edge-lights i:first-child{opacity:.8}

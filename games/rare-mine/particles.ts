@@ -4,10 +4,11 @@
  * it never touches game outcomes.
  */
 import type { Fx, MineState } from './game.ts';
+import { LOSE_BEAT, WIN_PARTY_AT } from './reach.ts';
 import { COIN_FRAMES, GEM, PALETTE as P, drawSprite } from './art.ts';
 import { CART, FLOOR_Y, IMPACT, JAR } from './layout.ts';
 
-export type CueKind = 'tock' | 'crumble' | 'land' | 'jar' | 'vein' | 'gem' | 'chaching' | 'roll' | 'win' | 'burn';
+export type CueKind = 'tock' | 'crumble' | 'land' | 'jar' | 'vein' | 'gem' | 'chaching';
 export interface Cue { readonly k: CueKind; readonly n: number }
 export interface View {
   /** Coins visibly in the cart (lags the pot while coins are in flight). */
@@ -15,6 +16,8 @@ export interface View {
   readonly jar: number;
   /** A burning pile that shrinks away after a lost bet. */
   readonly burning: number;
+  /** How the burning pile looks: still gold in the beat of silence, then glowing, then charred and crumbling. */
+  readonly burnLook: 'gold' | 'burn' | 'char';
   readonly shake: number;
   readonly flash: number;
   readonly flashColor: string;
@@ -22,16 +25,20 @@ export interface View {
 }
 export interface Particles {
   reset(s: MineState): void;
-  intake(s: MineState, now: number, reduced: boolean): Cue[];
+  /** `top`: rows of canvas above the scene (the coin torrent pours in from the very top). */
+  intake(s: MineState, now: number, reduced: boolean, top?: number): Cue[];
   step(s: MineState, now: number, reduced: boolean): View;
   draw(c: CanvasRenderingContext2D, now: number): void;
 }
 
 type Dest = 'cart' | 'jar' | 'none';
-interface Coin { gem: boolean; x0: number; y0: number; x1: number; y1: number; t0: number; dur: number; h: number; value: number; dest: Dest; spin: number }
+interface Coin { gem: boolean; x0: number; y0: number; x1: number; y1: number; t0: number; dur: number; h: number; value: number; dest: Dest; spin: number; fall?: boolean }
 interface Bit { x: number; y: number; vx: number; vy: number; t0: number; life: number; color: string; g: number; size: number }
 
-const MAX_COINS = 160, MAX_BITS = 260, BURN_TIME = 1.1;
+const MAX_COINS = 160, MAX_BITS = 260, BURN_TIME = 1.6;
+/** The win torrent: coins pour for this long; more coins the longer the streak. */
+const POUR_TIME = 2.2;
+const torrentSize = (streak: number): number => Math.min(100, 40 + 15 * Math.max(0, streak - 1));
 const rnd = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 const SPIN = [0, 1, 2, 3, 2, 1];
 
@@ -56,7 +63,7 @@ export function createParticles(): Particles {
   }
   function flash(now: number, color: string, peak: number, reduced: boolean) { if (!reduced) { flashAt = now; flashColor = color; flashPeak = peak; } }
 
-  function spawn(f: Fx, s: MineState, now: number, reduced: boolean): Cue[] {
+  function spawn(f: Fx, s: MineState, now: number, reduced: boolean, top: number): Cue[] {
     switch (f.kind) {
       case 'strike':
         // Cosmetic coins (real-mode taps) fly and clink but carry no value, so the pile never exceeds the real pot.
@@ -85,27 +92,21 @@ export function createParticles(): Particles {
         }
         return [{ k: 'chaching', n: f.coins }];
       }
-      case 'roll': return [{ k: 'roll', n: s.roll?.total ?? 0 }];
+      case 'roll': return [];
       case 'win': {
-        const n = reduced ? 3 : 14;
+        // ジャラジャラ: a torrent of coins pours from the top of the screen into the cart after the flash.
+        const n = reduced ? 3 : torrentSize(s.streak);
         for (let i = 0; i < n; i++) {
-          addCoin({ gem: false, x0: CART.x + CART.w / 2 + rnd(-8, 8), y0: CART.y - 30 - rnd(0, 20), x1: CART.x + CART.w / 2 + rnd(-16, 14), y1: CART.y - rnd(0, 6),
-            t0: now + i * 0.05, dur: rnd(0.35, 0.5), h: rnd(4, 14), value: f.coins / n, dest: 'cart', spin: Math.floor(rnd(0, 6)) });
+          addCoin({ gem: false, x0: CART.x + CART.w / 2 + rnd(-34, 34), y0: -top - rnd(8, 40), x1: CART.x + CART.w / 2 + rnd(-16, 14), y1: CART.y - rnd(0, 6),
+            t0: now + WIN_PARTY_AT + (i / n) * (reduced ? 0.4 : POUR_TIME) + rnd(0, 0.04), dur: rnd(0.45, 0.75), h: 0, value: f.coins / n, dest: 'cart',
+            spin: Math.floor(rnd(0, 6)), fall: true });
         }
-        if (!reduced) burst(20, CART.x + CART.w / 2, CART.y - 10, now, [P.goldHi, P.gold, '#ffffff'], 90, 30, 0.8);
-        flash(now, '#ffcf6e', 0.3, reduced);
-        return [{ k: 'win', n: f.coins }];
+        return [];
       }
       case 'burn': {
-        burnFrom = pile; burnAt = now; pile = 0;
-        const n = reduced ? 6 : 50;
-        for (let i = 0; i < n; i++) {
-          addBit({ x: CART.x + rnd(0, CART.w), y: CART.y + rnd(-6, 4), vx: rnd(-6, 6), vy: rnd(-60, -25), t0: now + rnd(0, BURN_TIME * 0.8),
-            life: rnd(0.4, 0.9), color: [P.flame, P.ember, P.burn, P.goldHi][i % 4], g: -10, size: i % 3 === 0 ? 2 : 1 });
-        }
-        if (!reduced) burst(16, CART.x + CART.w / 2, CART.y, now, [P.smoke, P.ember], 40, -20, 1.4);
-        flash(now, '#e04a2a', 0.28, reduced);
-        return [{ k: 'burn', n: f.coins }];
+        // The pile keeps its shape through the beat of silence, then burns, blackens and crumbles (fx-lose.ts draws the fire).
+        burnFrom = pile; burnAt = now + (reduced ? 0 : LOSE_BEAT); pile = 0;
+        return [];
       }
       default: return [];
     }
@@ -113,11 +114,11 @@ export function createParticles(): Particles {
 
   return {
     reset(s) { coins = []; bits = []; seen = s.fxId; pile = s.pot; jar = s.safe; burnAt = -10; flashAt = -10; shakeUntil = -10; },
-    intake(s, now, reduced) {
+    intake(s, now, reduced, top = 0) {
       const fresh = s.fx.filter(f => f.id > seen);
       if (s.fxId < seen) seen = s.fxId;
       seen = Math.max(seen, s.fxId);
-      return fresh.flatMap(f => spawn(f, s, now, reduced));
+      return fresh.flatMap(f => spawn(f, s, now, reduced, top));
     },
     step(s, now, reduced) {
       const dt = Math.min(0.05, Math.max(0, now - last)); last = now;
@@ -138,7 +139,7 @@ export function createParticles(): Particles {
       const p = (now - burnAt) / BURN_TIME;
       const f = (now - flashAt) / 0.35;
       return {
-        pile, jar, burning: p >= 0 && p < 1 ? burnFrom * (1 - p) : 0,
+        pile, jar, burning: p < 0 ? burnFrom : p >= 0 && p < 1 ? burnFrom * (1 - p * p) : 0, burnLook: p < 0 ? 'gold' : p > 0.45 ? 'char' : 'burn',
         shake: !reduced && now < shakeUntil ? 1 : 0, flash: f >= 0 && f < 1 ? flashPeak * (1 - f) : 0, flashColor,
         cues: [...(landed ? [{ k: 'land' as const, n: landed }] : []), ...(jarLanded ? [{ k: 'jar' as const, n: jarLanded }] : [])],
       };
@@ -152,7 +153,7 @@ export function createParticles(): Particles {
       c.globalAlpha = 1;
       for (const k of coins) {
         if (now < k.t0) continue;
-        const t = (now - k.t0) / k.dur, x = k.x0 + (k.x1 - k.x0) * t, y = k.y0 + (k.y1 - k.y0) * t - k.h * 4 * t * (1 - t);
+        const t = (now - k.t0) / k.dur, x = k.x0 + (k.x1 - k.x0) * t, y = k.fall ? k.y0 + (k.y1 - k.y0) * t * t : k.y0 + (k.y1 - k.y0) * t - k.h * 4 * t * (1 - t);
         if (k.gem) drawSprite(c, GEM, x - 7, y - 7, 2);
         else { const fr = COIN_FRAMES[SPIN[(Math.floor(now * 14) + k.spin) % SPIN.length]]; drawSprite(c, fr, x - 3, y - 3); }
       }
