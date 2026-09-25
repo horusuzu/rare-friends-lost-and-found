@@ -99,7 +99,7 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
 
     // Bet: odds first, simulated label on the dialog, outcome from the seeded stream. A win adds to the bonus;
     // a loss burns the pot and moves the baseline.
-    let wins = 0, losses = 0, best = 0, sawBet = false, sawBurn = false;
+    let wins = 0, losses = 0, best = 0, sawBet = false, sawBurn = false, sawWinFx = false, sawLoseFx = false;
     for (let round = 0; round < 40 && !(wins && losses); round++) {
       await until('pot to bet', async () => await attr('phase') === 'mine' && await game.getByTestId('bet').isEnabled());
       await tap('bet');
@@ -111,24 +111,34 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
       const expect = betOutcome(await num('betseed'))[0] ? 'win' : 'lose';
       const b0 = await ledger();
       await tap('confirm-bet');
+      // The reach plays; the simulated label stays on screen; tap to skip to the result.
+      await until('reach', async () => await attr('fx') === 'reach' && await attr('phase') === 'roll');
+      await game.getByTestId('stats-note').getByText(BET_NOTE, { exact: true }).waitFor();
+      await tap('roll');
       await until('result', async () => await num('lastid') !== b0.lastId && await attr('phase') === 'mine');
       assert.equal(await attr('last'), expect, 'resolves as the engine says');
       const b1 = await ledger();
       if (expect === 'win') {
         wins++; best = Math.max(best, b0.streak + 1);
         assert.ok(b1.bonus > b0.bonus, 'a win adds the stake to the bonus'); assert.equal(b1.baseline, b0.baseline); assert.equal(b1.streak, b0.streak + 1);
+        await until('win effect', async () => ['win', 'fever'].includes(await attr('fx')));
         await game.getByTestId('result').getByText(/連勝/).waitFor();
+        await game.getByTestId('result').getByText('（シミュレーション）', { exact: true }).waitFor();
+        sawWinFx = true;
       } else {
         losses++;
         assert.ok(b1.baseline >= b0.baseline, 'a loss moves the baseline up');
         assert.equal(b1.burned - b0.burned, b1.baseline - b0.baseline + b0.bonus, 'the whole pot burns (simulated)');
         assert.equal(b1.bonus, 0n); assert.equal(b1.streak, 0);
-        await game.getByTestId('result').getByText(/ RF burned$/).waitFor();
+        await until('burn effect', async () => await attr('fx') === 'lose');
+        await game.getByTestId('result').getByText(/^🔥 [\d,.]+ RF バーン$/).waitFor();
+        sawLoseFx = true;
         if (!sawBurn) { sawBurn = true; await shot('burn'); }
       }
       assert.ok(await potIdentity(), 'pot identity after a bet');
     }
     assert.ok(wins > 0 && losses > 0, `both outcomes seen (${wins} wins, ${losses} losses)`);
+    assert.ok(sawWinFx && sawLoseFx, 'the win and burn effects both appeared');
     assert.equal(await num('won'), wins); assert.equal(await num('lost'), losses); assert.equal(await num('best'), best);
     assert.equal(await game.getByTestId('stat-record').textContent(), `${wins} · ${losses}`);
     assert.match(await game.getByTestId('stat-burned').textContent(), /^🔥 [\d,]+\.\d+$/);

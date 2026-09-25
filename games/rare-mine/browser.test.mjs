@@ -76,7 +76,7 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     assert.equal(await num('streak'), 0);
 
     // Bet: odds first, then a fixed, seeded outcome. Keep betting until both a win and a loss have happened.
-    let wins = 0, losses = 0, maxStreak = 0, sawBet = false, sawBurn = false;
+    let wins = 0, losses = 0, maxStreak = 0, sawBet = false, sawBurn = false, sawWinFx = false, sawLoseFx = false;
     for (let round = 0; round < 40 && !(wins && losses && (maxStreak >= 2 || round >= 14)); round++) {
       await until('pot to bet', async () => await num('pot') > 0 && await attr('phase') === 'mine');
       for (let n = 0; n < 12 && await num('pot') < 12; n++) await rock();
@@ -88,18 +88,30 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
       const seed = await num('betseed'), expect = betOutcome(seed)[0] ? 'win' : 'lose';
       const lastId = await num('lastid'), stake = await num('pot'), burned = await num('burned'), streak = await num('streak');
       await tap('confirm-bet');
+      // The pachinko reach plays (2.5–4 s); its tier is cosmetic. Tap to skip straight to the result.
+      await until('reach', async () => await attr('fx') === 'reach' && await attr('phase') === 'roll');
+      assert.ok(['0', '1', '2'].includes(await attr('reach-tier')), 'reach tier');
+      await game.getByTestId('roll').waitFor();
+      await tap('roll');
       await until('result', async () => await num('lastid') !== lastId && await attr('phase') === 'mine');
       assert.equal(await attr('last'), expect, `seed ${seed} resolves as the engine says`);
       if (expect === 'win') {
         wins++; assert.equal(await num('streak'), streak + 1); maxStreak = Math.max(maxStreak, streak + 1);
+        const fx = streak + 1 >= 3 ? 'fever' : 'win';
+        await until(`${fx} effect`, async () => await attr('fx') === fx && await attr('win-tier') === String(Math.min(3, streak)));
         await game.getByTestId('result').getByText(/連勝/).waitFor();
+        await game.getByTestId('streak-badge').getByText(`${streak + 1}連チャン`, { exact: true }).waitFor();
+        sawWinFx = true;
       } else {
         losses++; assert.equal(await num('burned'), burned + stake); assert.equal(await num('streak'), 0);
-        await game.getByTestId('result').getByText(`🔥 ${stake.toLocaleString('en-US')} burned`, { exact: true }).waitFor();
+        await until('burn effect', async () => await attr('fx') === 'lose');
+        await game.getByTestId('result').getByText(`🔥 ${stake.toLocaleString('en-US')} バーン`, { exact: true }).waitFor();
+        sawLoseFx = true;
         if (!sawBurn) { sawBurn = true; await shot('burn'); }
       }
     }
     assert.ok(wins > 0 && losses > 0, `both outcomes seen (${wins} wins, ${losses} losses)`);
+    assert.ok(sawWinFx && sawLoseFx, 'the win and burn effects both appeared');
     assert.equal(await num('best'), maxStreak, 'best streak stat');
     assert.equal(await num('won'), wins); assert.equal(await num('lost'), losses);
     assert.match(await game.getByTestId('stat-burned').textContent(), new RegExp(`🔥 ${(await num('burned')).toLocaleString('en-US')}`));
@@ -127,6 +139,20 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     await game.getByRole('button', { name: '再開する', exact: true }).click();
     await until('resumed', async () => await attr('paused') === 'false');
     await until('mining again', async () => await num('strikes') > frozen);
+
+    // Reduced motion (pause menu): the reach is a 0.3 s static reveal and the result card still appears.
+    await page.keyboard.press('p'); await game.getByTestId('motion').click();
+    try { await until('reduced', async () => await attr('reduced') === 'true', 3000); } catch (e) { await page.screenshot({ path: './artifacts/debug-reduced.png' }); console.log(await game.getByTestId('motion').getAttribute('aria-pressed'), await attr('paused'), await attr('reduced')); throw e; }
+    await game.getByRole('button', { name: '再開する', exact: true }).click(); await until('resumed reduced', async () => await attr('paused') === 'false');
+    await until('pot for reduced bet', async () => await num('pot') > 0 && await attr('phase') === 'mine');
+    const reducedId = await num('lastid');
+    await tap('bet'); await until('confirm reduced', async () => await attr('phase') === 'confirm');
+    await tap('confirm-bet');
+    await until('reduced result', async () => await num('lastid') !== reducedId && await attr('phase') === 'mine', 5_000);
+    await until('reduced card', async () => ['win', 'fever', 'lose'].includes(await attr('fx')));
+    await game.getByTestId('result').waitFor();
+    await page.keyboard.press('p'); await game.getByTestId('motion').click(); await until('full motion', async () => await attr('reduced') === 'false');
+    await game.getByRole('button', { name: '再開する', exact: true }).click(); await until('resumed full', async () => await attr('paused') === 'false');
 
     // Language toggle switches the controls and the simulation label.
     await tap('lang');
