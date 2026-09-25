@@ -141,8 +141,9 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     await until('mining again', async () => await num('strikes') > frozen);
 
     // Reduced motion (pause menu): the reach is a 0.3 s static reveal and the result card still appears.
-    await page.keyboard.press('p'); await game.getByTestId('motion').click();
-    try { await until('reduced', async () => await attr('reduced') === 'true', 3000); } catch (e) { await page.screenshot({ path: './artifacts/debug-reduced.png' }); console.log(await game.getByTestId('motion').getAttribute('aria-pressed'), await attr('paused'), await attr('reduced')); throw e; }
+    // The motion toggle flips a setting that may already be on (the harness can emulate reduced motion): set it, don't flip it.
+    const setMotion = async want => { if (await attr('reduced') !== want) await game.getByTestId('motion').click(); await until(`reduced=${want}`, async () => await attr('reduced') === want, 3000); };
+    await page.keyboard.press('p'); await setMotion('true');
     await game.getByRole('button', { name: '再開する', exact: true }).click(); await until('resumed reduced', async () => await attr('paused') === 'false');
     await until('pot for reduced bet', async () => await num('pot') > 0 && await attr('phase') === 'mine');
     const reducedId = await num('lastid');
@@ -151,7 +152,7 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     await until('reduced result', async () => await num('lastid') !== reducedId && await attr('phase') === 'mine', 5_000);
     await until('reduced card', async () => ['win', 'fever', 'lose'].includes(await attr('fx')));
     await game.getByTestId('result').waitFor();
-    await page.keyboard.press('p'); await game.getByTestId('motion').click(); await until('full motion', async () => await attr('reduced') === 'false');
+    await page.keyboard.press('p'); await setMotion('false');
     await game.getByRole('button', { name: '再開する', exact: true }).click(); await until('resumed full', async () => await attr('paused') === 'false');
 
     // Language toggle switches the controls and the simulation label.
