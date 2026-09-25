@@ -2,7 +2,9 @@ import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 import { testGame } from '@rarefriends/friendsdk/testing';
 import { betOutcome } from './economy.ts';
+import { routeRewards } from './rewards-fixture.mjs';
 
+// Practice mode: the fixture Friend is not activated, so real rewards read as zero and the simulated mine is offered.
 // Optional: MINE_CHROMIUM points at an installed headless Chromium. MINE_SIZE='[[390,844]]' runs one viewport.
 const launch = chromium.launch.bind(chromium);
 if (process.env.MINE_CHROMIUM) chromium.launch = o => launch({ ...o, executablePath: process.env.MINE_CHROMIUM });
@@ -11,7 +13,9 @@ const shots = new Set(process.env.MINE_SHOT_ALL ? sizes.map(([w]) => w) : [390, 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 for (const [width, height] of sizes) console.log(await testGame('./games/rare-mine', {
-  width, height, timeout: 20_000, check: async ({ page, game }) => {
+  width, height, timeout: 20_000, check: async ({ page, game, account }) => {
+    const rewards = await routeRewards(page, { owner: account });
+    rewards.inactive = true;
     const screen = game.getByTestId('screen');
     const attr = name => screen.getAttribute(`data-${name}`);
     const num = async name => Number(await attr(name));
@@ -27,13 +31,17 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
 
     // Title: the Friend is the miner; the currency is labelled as a simulation.
     await connect();
-    await game.getByTestId('start').waitFor();
+    await game.getByTestId('title-rewards').getByText('このFriendには報酬がたまっていません。アクティベートは公式サイトで。', { exact: true }).waitFor();
+    await game.getByTestId('start').getByText('練習モードで採掘', { exact: true }).waitFor();
+    await game.getByTestId('retry-title').waitFor();
     await game.getByRole('img', { name: 'Friend #7730', exact: true }).first().waitFor();
     await game.getByText('シミュレーション・本物のRFではありません', { exact: false }).first().waitFor();
     await shot('title');
     await tap('start');
     await until('mining', async () => await attr('started') === 'true' && await attr('phase') === 'mine');
     await game.getByTestId('sim-note').getByText('シミュレーション・本物のRFではありません', { exact: true }).waitFor();
+    await game.getByTestId('sim-note').getByText('練習モード', { exact: true }).waitFor();
+    await game.getByTestId('retry-rewards').waitFor();
 
     // Layout: every control is a 44px target clear of the host wallet toolbar; Withdraw and Bet are the same size.
     const wallet = await page.getByRole('button', { name: 'Open Friend wallet', exact: true }).boundingBox();
@@ -139,12 +147,12 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     await game.getByTestId('pause').click(); await until('saved on pause', async () => await num('saves') > saves);
     const kept = { safe: await num('safe'), burned: await num('burned'), won: await num('won'), lost: await num('lost'), best: await num('best') };
     await connect();
-    await game.getByTestId('continue').waitFor();
+    await game.getByTestId('continue').getByText(/^練習モードのつづき/).waitFor();
     assert.match(await game.getByTestId('continue').textContent(), new RegExp(kept.safe.toLocaleString('en-US')));
     await tap('continue');
     await until('resumed mine', async () => await attr('started') === 'true');
     assert.deepEqual({ safe: await num('safe'), burned: await num('burned'), won: await num('won'), lost: await num('lost'), best: await num('best') }, kept);
     assert.equal(await game.getByTestId('sound').getAttribute('aria-pressed'), 'false', 'sound setting survives a reload');
-    console.log(`Rare Mine ${width}x${height}: mine, combo, withdraw, bet ${wins}W/${losses}L (best ×${2 ** maxStreak}), burn, stats, sound, pause, language, reload PASS`);
+    console.log(`Rare Mine ${width}x${height}: practice notice, mine, combo, withdraw, bet ${wins}W/${losses}L (best ×${2 ** maxStreak}), burn, stats, sound, pause, language, reload PASS`);
   },
 }));
