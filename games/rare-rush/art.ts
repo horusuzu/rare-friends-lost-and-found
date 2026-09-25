@@ -61,7 +61,8 @@ function bitmap(c: CanvasRenderingContext2D, rows: Sprite, x: number, y: number,
 interface Point { x: number; y: number; z: number }
 
 export function drawRush(c: CanvasRenderingContext2D, s: State, cam: Camera, friend: Sprite | null, _trail: readonly Trail[], reduced: boolean, shout: string | null = null): void {
-  const W = c.canvas.width, H = VIEW_H, cx = W / 2, cy = H * 0.46;
+  // Drawing is in VIEW_H units; the caller scales the context when the backing store is larger (high-DPR phones).
+  const W = c.canvas.width * VIEW_H / c.canvas.height, H = VIEW_H, cx = W / 2, cy = H * 0.46;
   const f = H * 0.95 * cam.focal, speed = speedOf(s);
   const camY = s.y + EYE, lat0 = lateral(s.x, s.seed), heading = lateralSlope(s.x, s.seed);
   const sinP = Math.sin(cam.pitch), cosP = Math.cos(cam.pitch);

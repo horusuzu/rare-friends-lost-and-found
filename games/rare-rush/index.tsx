@@ -24,6 +24,32 @@ function FriendPixels({ rows, size, label, fill = '#fff4e8' }: { rows: Sprite; s
   </svg>;
 }
 
+/** Canvas backing-store scale: sharp on high-DPR phones, capped so a 3x screen does not triple the fill cost. */
+const MAX_PIXEL_RATIO = 2;
+const pixelRatio = () => Math.min(MAX_PIXEL_RATIO, Math.max(1, Math.round(window.devicePixelRatio || 1)));
+function usePixelRatio() {
+  const [ratio, setRatio] = useState(pixelRatio);
+  useEffect(() => {
+    const update = () => setRatio(pixelRatio());
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+  return ratio;
+}
+
+/**
+ * A control hint as a main line and a follow-up line, so narrow phones break it between the two, never mid-word.
+ * The full text stays in the button; a "/" separator is only hidden when the lines stack.
+ */
+function Hint({ text, split }: { text: string; split: '→' | '/' }) {
+  const at = text.indexOf(split);
+  if (at < 0) return <span className="hint-main">{text}</span>;
+  const main = text.slice(0, at).trimEnd(), rest = text.slice(at + split.length).trimStart();
+  return split === '→'
+    ? <><span className="hint-main">{main}</span> <span className="hint-sub">→ {rest}</span></>
+    : <><span className="hint-main">{main}</span> <span className="hint-sep" aria-hidden="true">/</span> <span className="hint-sub">{rest}</span></>;
+}
+
 const newSeed = () => (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
 
 export default function RareRush(props: GameComponentProps) {
@@ -41,6 +67,7 @@ function Ride({ friendId, collection = 'generations', client, paused }: GameComp
   const canvas = useRef<HTMLCanvasElement>(null), world = useRef<State>(createGame(1)), camera = useRef<Camera>(newCamera(world.current));
   const trail = useRef<Trail[]>([]), holds = useRef(new Set<string>()), turboKeys = useRef(new Set<string>()), sfx = useRef<RushSound | null>(null);
   const saved = useRef<SavedRecord>(EMPTY_RECORD), unsaved = useRef(false), alive = useRef(false), writing = useRef(false), toggleRef = useRef(() => {});
+  const ratio = usePixelRatio();
   const t = (ja: string, en: string) => lang === 'ja' ? ja : en;
   const active = started && !paused && !manualPause && ready;
   const label = `${collection === 'genesis' ? 'Genesis' : 'Friend'} #${String(friendId)}`;
@@ -67,6 +94,9 @@ function Ride({ friendId, collection = 'generations', client, paused }: GameComp
     const release = () => { holds.current.clear(); turboKeys.current.clear(); };
     const blur = () => { release(); setManualPause(true); };
     const visibility = () => { setHidden(document.hidden); if (document.hidden) blur(); };
+    // iOS can freeze the page without a visibilitychange; pagehide pauses the ride as well.
+    const leave = () => { setHidden(true); blur(); };
+    const back = () => setHidden(document.hidden);
     const down = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
       if (key === 'm' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !(e.target as HTMLElement)?.closest('input')) { e.preventDefault(); toggleRef.current(); return; }
@@ -78,35 +108,41 @@ function Ride({ friendId, collection = 'generations', client, paused }: GameComp
     const up = (e: KeyboardEvent) => { holds.current.delete(`key:${e.key.toLowerCase()}`); turboKeys.current.delete(`key:${e.key.toLowerCase()}`); };
     window.addEventListener('keydown', down); window.addEventListener('keyup', up);
     window.addEventListener('blur', blur); document.addEventListener('visibilitychange', visibility);
+    window.addEventListener('pagehide', leave); window.addEventListener('pageshow', back);
     return () => {
       release();
       window.removeEventListener('keydown', down); window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', visibility);
+      window.removeEventListener('pagehide', leave); window.removeEventListener('pageshow', back);
     };
   }, []);
 
   // Input pressed while paused never carries into play.
   useEffect(() => { holds.current.clear(); turboKeys.current.clear(); }, [active]);
   // Sound: no AudioContext until a user gesture; everything, including the wind, is released on unmount.
+  // iOS Safari only resumes audio from touchend/pointerup, so those gestures unlock (or resume) it too.
   useEffect(() => {
     const board = createRushSound();
     board.setEnabled(saved.current.sound); sfx.current = board;
     const gesture = () => { if (saved.current.sound) board.unlock(); };
-    window.addEventListener('pointerdown', gesture, true); window.addEventListener('keydown', gesture, true);
+    const GESTURES = ['pointerdown', 'pointerup', 'touchend', 'keydown'] as const;
+    for (const type of GESTURES) window.addEventListener(type, gesture, true);
     return () => {
-      window.removeEventListener('pointerdown', gesture, true); window.removeEventListener('keydown', gesture, true);
+      for (const type of GESTURES) window.removeEventListener(type, gesture, true);
       board.dispose(); if (sfx.current === board) sfx.current = null;
     };
   }, []);
   useEffect(() => { sfx.current?.setSilenced(Boolean(paused) || hidden || manualPause); }, [paused, hidden, manualPause]);
-  // Match the canvas to the stage so portrait phones use the full height.
+  // Match the canvas to the stage so portrait phones use the full height; the backing store is scaled by the pixel ratio.
   useEffect(() => {
     const el = canvas.current, stage = el?.parentElement;
-    if (!el || !stage || typeof ResizeObserver === 'undefined') return;
-    const fit = () => { const { width, height } = stage.getBoundingClientRect(); if (width > 0 && height > 0) el.width = viewWidth(width / height); };
+    if (!el || !stage) return;
+    el.height = VIEW_H * ratio;
+    if (typeof ResizeObserver === 'undefined') { el.width = viewWidth(4 / 3) * ratio; return; }
+    const fit = () => { const { width, height } = stage.getBoundingClientRect(); if (width > 0 && height > 0) el.width = viewWidth(width / height) * ratio; };
     const observer = new ResizeObserver(fit); observer.observe(stage); fit();
     return () => observer.disconnect();
-  }, []);
+  }, [ratio]);
 
   useEffect(() => {
     let frame = 0, last = 0, published = 0;
@@ -131,7 +167,7 @@ function Ride({ friendId, collection = 'generations', client, paused }: GameComp
       const diving = s.status === 'running' && speed > 42 && (s.grounded ? trackSlope(s.x, s.seed) < -0.7 : s.vy < -22);
       const shout = s.screamTime > 0 || diving ? (lang === 'ja' ? 'キャーーッ!!' : 'AAAAAH!!') : null;
       const c = canvas.current?.getContext('2d');
-      if (c) drawRush(c, s, camera.current, sprite, trail.current, reduced, active ? shout : null);
+      if (c) { const k = c.canvas.height / VIEW_H; c.setTransform(k, 0, 0, k, 0, 0); drawRush(c, s, camera.current, sprite, trail.current, reduced, active ? shout : null); }
       if (now - published > 80 || s.status === 'over') { setView(s); published = now; }
       frame = requestAnimationFrame(tick);
     }
@@ -210,7 +246,10 @@ function Ride({ friendId, collection = 'generations', client, paused }: GameComp
     void client.shareScore!(Math.round(s.score), Math.min(450, Math.max(1, kmh(s.maxSpeed))), 'over', lang).catch(() => setShareError(true));
   };
 
-  return <section className="rush" lang={lang} aria-label="Rare Rush">
+  /** Long-press must not open the browser menu or the iOS callout over the stage and the hold buttons. */
+  const noMenu = (e: React.SyntheticEvent) => e.preventDefault();
+
+  return <section className="rush" lang={lang} aria-label="Rare Rush" onContextMenu={noMenu}>
     <header>
       <div className="brand"><small>RARE FRIENDS / ARCADE 03</small><h1>RARE <span>RUSH</span></h1></div>
       <div className="top-actions">
@@ -268,7 +307,8 @@ function Ride({ friendId, collection = 'generations', client, paused }: GameComp
         <span className="pips" aria-hidden="true">{[0, 1, 2].map(i => <i key={i} className={i < s.turbos ? 'on' : ''} />)}</span>
       </button>
       <button className="hold" disabled={!active || finished} {...press('button')} aria-label={t('長押し', 'Hold')}>
-        {launching ? t('長押しでチャージ → 離して発射', 'HOLD to charge → RELEASE to launch') : t('長押し：加速 / 離す：ジャンプ', 'HOLD: dive / RELEASE: fly')}
+        {launching ? <Hint text={t('長押しでチャージ → 離して発射', 'HOLD to charge → RELEASE to launch')} split="→" />
+          : <Hint text={t('長押し：加速 / 離す：ジャンプ', 'HOLD: dive / RELEASE: fly')} split="/" />}
       </button>
     </div>
     <footer>
