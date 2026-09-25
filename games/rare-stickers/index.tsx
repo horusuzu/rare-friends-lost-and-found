@@ -102,8 +102,10 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
   useEffect(() => { sfx.setEnabled(album?.sound ?? true); }, [sfx, album?.sound]);
   useEffect(() => {
     const sync = () => sfx.setSuspended(paused || document.hidden);
-    sync(); document.addEventListener('visibilitychange', sync);
-    return () => document.removeEventListener('visibilitychange', sync);
+    // pagehide covers iOS app switching and back-forward cache, where visibilitychange can be skipped.
+    const hide = () => sfx.setSuspended(true);
+    sync(); document.addEventListener('visibilitychange', sync); window.addEventListener('pagehide', hide); window.addEventListener('pageshow', sync);
+    return () => { document.removeEventListener('visibilitychange', sync); window.removeEventListener('pagehide', hide); window.removeEventListener('pageshow', sync); };
   }, [sfx, paused]);
   useEffect(() => {
     const unlock = () => { sfx.unlock(); };
@@ -247,7 +249,9 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
   const friendsCollected = new Set(album.items.map(it => keyOf(it.sticker.collection, it.sticker.tokenId))).size;
   const sel = selected !== null ? album.items[selected] : null;
 
-  return <section className="stickers" lang={lang} aria-label="Rare Stickers">
+  // Long-press on cards and buttons should not open the browser menu; code fields keep theirs for copy/paste.
+  const noMenu = (e: React.MouseEvent) => { if (!(e.target instanceof HTMLInputElement)) e.preventDefault(); };
+  return <section className="stickers" lang={lang} aria-label="Rare Stickers" onContextMenu={noMenu}>
     <header>
       <div className="brand"><small>RARE FRIENDS / TRADING CARDS</small><h1>{t('レアトレカ', 'RARE CARDS')}</h1></div>
       <div className="header-tools">

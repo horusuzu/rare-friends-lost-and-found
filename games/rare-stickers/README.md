@@ -18,7 +18,8 @@ Chain (4663). Japanese and English.
 - **Free packs:** three a day (stock up to nine), one card of your own Friend each.
   Odds: Matte 30 %, Patch 18 %, Puffy 14 %, Clear 12 %, Glitter 11 %, Holo 7 %, Prism 5 %, Gold 3 %.
 - **Binder:** nine pockets per page; tap (or Enter) to view a card large — shiny finishes glint as
-  the pointer moves; Escape closes it.
+  the pointer moves or a finger drags across the card (between touches they sway gently on their
+  own, no motion sensors needed); Escape closes it.
 - **Trade:** a card's trade code (`RF-XXXX-…`) passes its design to a friend, who pastes it in the
   Trade tab. Your own Friend comes only from packs; other Friends only from trades; a book never
   holds the same card twice.
@@ -29,6 +30,17 @@ Chain (4663). Japanese and English.
   spread and 10 % criticals) until one falls; best of five wins. Sun beats Moon, Moon beats Star,
   Star beats Sun. Results are deterministic from both decks and the challenge nonce, so both sides
   see identical battles. A challenge can be answered once and a reply counted once.
+
+## Phones
+
+Sized for phones in portrait and landscape (checked at 360×640, 375×667, 390×664, 430×740 and
+664×390): the nine-pocket binder and its pager always fit on one screen, controls are at least
+44 px, text at least 12 px, and the host bar below the game is a single compact row. In landscape
+the title, tabs and ♪/language share one bar and the pack, card view and battle cards scale to the
+height. Taps do not select text, flash or open the long-press menu; trade and battle code fields
+stay selectable for copy and paste and use 16 px text so iOS does not zoom. Sound pauses when the
+page is hidden (including iOS app switches) and resumes on return. `mobile.test.mjs` runs these
+checks with touch-phone emulation.
 
 ## Sound
 
@@ -91,6 +103,7 @@ node scripts/dev-game.mjs check games/rare-stickers
 node --test --experimental-test-coverage games/rare-stickers/album.test.mjs games/rare-stickers/cards.test.mjs games/rare-stickers/sound.test.mjs
 node games/rare-stickers/browser.test.mjs
 node games/rare-stickers/genesis-browser.test.mjs
+node games/rare-stickers/mobile.test.mjs   # phone sizes with touch emulation
 node scripts/dev-game.mjs build games/rare-stickers --outdir release-stickers
 ```
 

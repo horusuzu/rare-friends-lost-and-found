@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DECK_SIZE, ELEMENTS, battle, battleSeed, cardStats, decodeBattle, encodeBattle, type BattleResult } from './cards.ts';
 import { addChallenge, hasFought, markFought, recordBattle, recordBurn, stickerName, takeChallenge, type Album, type Owner, type Sticker } from './album.ts';
 import { CardCanvas } from './card-canvas.tsx';
@@ -121,7 +121,9 @@ function BattleReplay({ replay, lang, reduced, rowsFor, copy, copyMsg, play, onC
 }) {
   const t = (ja: string, en: string) => lang === 'ja' ? ja : en;
   const steps = useMemo(() => replay.result.rounds.flatMap((r, ri) => r.hits.map((h, hi) => ({ ri, hi }))), [replay]);
-  const [at, setAt] = useState(reduced ? steps.length : 0);
+  const [at, setAt] = useState(reduced ? steps.length : 0), node = useRef<HTMLElement>(null);
+  // The code field is below the replay; on a phone bring the fight into view when it starts.
+  useEffect(() => { node.current?.scrollIntoView?.({ block: 'nearest', behavior: reduced ? 'auto' : 'smooth' }); }, []);
   useEffect(() => {
     if (at >= steps.length) return;
     const timer = setTimeout(() => setAt(a => a + 1), 140);
@@ -143,7 +145,7 @@ function BattleReplay({ replay, lang, reduced, rowsFor, copy, copyMsg, play, onC
   const card = (side: 'a' | 'b') => side === 'a' ? round.a : round.b;
   const verdict = replay.result.winner === 'draw' ? t('引き分け', 'DRAW') : replay.result.winner === my ? t('勝利！', 'YOU WIN!') : t('敗北…', 'YOU LOSE');
   const roundWins = (side: 'a' | 'b') => replay.result.rounds.slice(0, done ? undefined : cur.ri).filter(r => r.winner === side).length;
-  return <section className="replay" aria-label={t('バトル', 'Battle')}>
+  return <section ref={node} className="replay" aria-label={t('バトル', 'Battle')}>
     <div className="score"><span>{t('あなた', 'You')} {roundWins(my)}</span><b>{t(`${cur.ri + 1}戦目`, `Round ${cur.ri + 1}`)}</b><span>{roundWins(their)} {t('相手', 'Them')}</span></div>
     <div className="arena">
       {([my, their] as const).map(side => {
