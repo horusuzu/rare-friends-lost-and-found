@@ -114,3 +114,19 @@ test('battle record: wins/losses/draws, burned tickets, pending challenges and o
   for (let i = 0; i < 150; i++) full = addSticker(full, openPack(i % 2 ? me : genesis, i), 'pack', i);
   assert.ok(new TextEncoder().encode(serializeAlbum(full)).byteLength < 32 * 1024);
 });
+
+test('the sound setting is saved with the book; older books load with sound on', async () => {
+  const {setSound} = await import('./album.ts');
+  const a = newAlbum('2026-09-25'); assert.equal(a.sound, true, 'new books start with sound on');
+  const off = setSound(a, false);
+  assert.equal(off.sound, false); assert.equal(a.sound, true, 'the original book is unchanged');
+  assert.equal(setSound(off, false), off, 'no change, same book');
+  assert.equal(parseAlbum(serializeAlbum(off)).sound, false, 'sound off survives a save');
+  assert.deepEqual(parseAlbum(serializeAlbum(off)), off);
+  assert.equal(parseAlbum(serializeAlbum(setSound(off, true))).sound, true);
+  const old = JSON.parse(serializeAlbum(addSticker(a, openPack(me, 1), 'pack', 1))); delete old.sound;
+  const loaded = parseAlbum(JSON.stringify(old));
+  assert.equal(loaded.sound, true, 'a book saved before the setting existed plays sound');
+  assert.equal(loaded.items.length, 1);
+  for (const bad of ['off', 0, null, 1]) assert.throws(() => parseAlbum(JSON.stringify({...old, sound: bad})), /sticker book/i);
+});
