@@ -21,13 +21,31 @@ require no transaction or signature. Choose Japanese or English, then start.
 - Game over: an orb resting above the dashed line for two seconds fills the jar.
   Newly dropped orbs have a 1.2-second grace period.
 - Pause: P, Escape or the pause button. Losing focus pauses play.
+- Sound: the ♪ button or M turns sound on and off (see [Sound](#sound)).
 - Best score and best tier are stored locally per SDK session identity. Storage failures do not block play.
 
 No entry fee, purchases, RF rewards or redemption promises. Scores have no monetary
 value. The required game.json chance-game schema is unused by this arcade mode;
 no purchase, play or settlement action is called. The SDK host uses local preview
-mode. There is no audio. Reduced-motion preference disables merge ring effects and
-the blinking warning line.
+mode. Reduced-motion preference disables merge ring effects and the blinking warning line.
+
+## Sound
+
+All sound is synthesised with WebAudio in `sound.ts`; there are no audio files.
+
+- Cues: a soft plip when an orb drops; a quiet thud when a falling orb lands (scaled by
+  impact, rate-limited); a merge note whose pitch climbs a pentatonic scale with the new
+  tier; a shimmer for big merges (tier 7+) and a fanfare for your Friend orb; a rising
+  combo blip from the third quick merge in a row; a warning pulse that comes closer
+  together while an orb sits over the danger line; a falling phrase at game over; and a
+  short fanfare when you beat your previous best.
+- Toggle: the ♪ button in the top bar (`aria-pressed`, labelled "サウンド オン/オフ" /
+  "Sound on/off") or the **M** key. The setting is saved with your best score in the
+  same local save; older saves without it load with sound on.
+- The AudioContext is created only after your first tap, click or key press, and not at
+  all while sound is off. At most six cues play at once, each with a soft attack and
+  decay into a limiter. Everything falls silent while the host pauses the game, while
+  play is paused, when the page is hidden and when the game is closed.
 
 ## X score sharing
 
@@ -46,7 +64,7 @@ npm run build
 node scripts/dev-game.mjs dev games/rare-drop
 node node_modules/typescript/bin/tsc -p games/rare-drop/tsconfig.json
 node scripts/dev-game.mjs check games/rare-drop
-node --test --experimental-test-coverage games/rare-drop/engine.test.mjs
+node --test --experimental-test-coverage games/rare-drop/engine.test.mjs games/rare-drop/sound.test.mjs games/rare-drop/save.test.mjs
 node games/rare-drop/browser.test.mjs
 node scripts/dev-game.mjs build games/rare-drop --outdir release-drop
 ```

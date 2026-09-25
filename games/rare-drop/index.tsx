@@ -3,19 +3,12 @@ import type { GameComponentProps } from '@rarefriends/friendsdk/runtime';
 import { createFriendReader, createGenesisReader } from '@rarefriends/friendsdk/sprites';
 import { createGame, step, WIDTH, HEIGHT, TIERS, RADII, type State } from './engine.js';
 import { TIER_INFO, drawJar, drawOrb, type Sprite } from './art.js';
+import { createDropSound, type DropSound } from './sound.js';
+import { cuesBetween, NO_COMBO } from './cues.js';
+import { EMPTY_RECORD, parseSave, serializeSave, type SavedRecord } from './save.js';
 import './style.css';
 
 type Lang = 'ja' | 'en';
-interface Saved { version: 1; best: number; bestTier: number }
-
-function parseSave(raw: string | null): Saved | null {
-  if (!raw) return null;
-  const saved = JSON.parse(raw) as Partial<Saved>;
-  const ok = saved.version === 1 && Number.isSafeInteger(saved.best) && saved.best! >= 0 && saved.best! < 1e9 &&
-    Number.isInteger(saved.bestTier) && saved.bestTier! >= 0 && saved.bestTier! <= TIERS;
-  if (!ok) throw new Error('Invalid save');
-  return saved as Saved;
-}
 
 function FriendPixels({ rows, fill, label, size, className }: { rows: Sprite; fill: string; label: string; size?: number; className?: string }) {
   return <svg className={className} width={size} height={size} viewBox="0 0 16 16" role="img" aria-label={label}>
@@ -50,9 +43,11 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
   const [view, setView] = useState<State>(() => createGame(1));
   const [best, setBest] = useState(0), [bestTier, setBestTier] = useState(0);
   const [saveError, setSaveError] = useState(false), [shareError, setShareError] = useState(false);
+  const [sound, setSound] = useState(true), [hidden, setHidden] = useState(() => document.hidden);
+  const sfx = useRef<DropSound | null>(null), combo = useRef(NO_COMBO), writing = useRef(false), toggleRef = useRef(() => {});
   const canvas = useRef<HTMLCanvasElement>(null), world = useRef<State>(createGame(1));
   const keys = useRef(new Set<string>()), touch = useRef(new Map<number, string>());
-  const dropTap = useRef(false), aim = useRef<number | null>(null), record = useRef({ best: 0, bestTier: 0 }), unsaved = useRef(false), alive = useRef(false);
+  const dropTap = useRef(false), aim = useRef<number | null>(null), record = useRef<SavedRecord>(EMPTY_RECORD), unsaved = useRef(false), alive = useRef(false);
   const t = (ja: string, en: string) => lang === 'ja' ? ja : en;
   const tierName = (tier: number) => tier < 1 ? '—' : lang === 'ja' ? TIER_INFO[tier - 1].ja : TIER_INFO[tier - 1].en;
   const active = started && !paused && !manualPause && ready;
@@ -71,8 +66,8 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
       if (!current) return;
       setSprite(art.clips.idle.down[0].rows);
       try {
-        const saved = parseSave(raw);
-        if (saved) { record.current = { best: saved.best, bestTier: saved.bestTier }; setBest(saved.best); setBestTier(saved.bestTier); }
+        const saved = parseSave(raw, TIERS);
+        if (saved) { record.current = saved; setBest(saved.best); setBestTier(saved.bestTier); setSound(saved.sound); sfx.current?.setEnabled(saved.sound); }
       } catch { setSaveError(true); }
       setReady(true);
     })().catch(() => { if (current) setError('load'); });
@@ -82,10 +77,11 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
   useEffect(() => {
     const clear = () => { keys.current.clear(); touch.current.clear(); dropTap.current = false; aim.current = null; };
     const blur = () => { clear(); setManualPause(true); };
-    const visibility = () => { if (document.hidden) blur(); };
+    const visibility = () => { setHidden(document.hidden); if (document.hidden) blur(); };
     const down = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.closest('button,input')) return;
       const key = e.key.toLowerCase();
+      if (key === 'm' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && !(e.target as HTMLElement)?.closest('input')) { e.preventDefault(); toggleRef.current(); return; }
+      if ((e.target as HTMLElement)?.closest('button,input')) return;
       if (['arrowleft', 'arrowright', 'a', 'd'].includes(key)) { e.preventDefault(); aim.current = null; keys.current.add(key); }
       if ([' ', 'enter', 'arrowdown', 's'].includes(key)) { e.preventDefault(); if (!e.repeat) dropTap.current = true; }
       if (key === 'escape' || key === 'p') { e.preventDefault(); clear(); setManualPause(v => !v); }
@@ -100,6 +96,19 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
     };
   }, []);
 
+  // Sound: no AudioContext until a user gesture; released on unmount.
+  useEffect(() => {
+    const board = createDropSound();
+    board.setEnabled(record.current.sound); sfx.current = board;
+    const gesture = () => { if (record.current.sound) board.unlock(); };
+    window.addEventListener('pointerdown', gesture, true); window.addEventListener('keydown', gesture, true);
+    return () => {
+      window.removeEventListener('pointerdown', gesture, true); window.removeEventListener('keydown', gesture, true);
+      board.dispose(); if (sfx.current === board) sfx.current = null;
+    };
+  }, []);
+  useEffect(() => { sfx.current?.setSilenced(Boolean(paused) || hidden || manualPause); }, [paused, hidden, manualPause]);
+
   // Clear on every transition so input pressed while paused never fires on resume.
   useEffect(() => { keys.current.clear(); touch.current.clear(); dropTap.current = false; }, [active]);
 
@@ -111,8 +120,10 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
       if (active && world.current.status === 'playing') {
         const held = (key: string) => keys.current.has(key) || [...touch.current.values()].includes(key);
         const move = Number(held('arrowright') || held('d')) - Number(held('arrowleft') || held('a'));
-        const next = step(world.current, { move, aim: move ? null : aim.current, drop: dropTap.current }, dt);
+        const prev = world.current, next = step(prev, { move, aim: move ? null : aim.current, drop: dropTap.current }, dt);
         dropTap.current = false; world.current = next;
+        const heard = cuesBetween(prev, next, combo.current); combo.current = heard.combo;
+        for (const cue of heard.cues) sfx.current?.play(cue.id, { pitch: cue.pitch, gain: cue.gain });
         if (next.status === 'over') saveRecord(next);
       }
       const c = canvas.current?.getContext('2d');
@@ -124,28 +135,50 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
     return () => cancelAnimationFrame(frame);
   }, [active, sprite, client]);
 
-  /** Keep the record dirty until a write succeeds, so a rejected save (for example a host pause) is retried. */
+  /**
+   * Keep the record dirty until a write succeeds, so a rejected save (for example a host pause) is retried.
+   * One write at a time: a change made during a write is written when it finishes.
+   */
   function persist() {
     if (!client.saveLocal) return;
-    const snapshot = record.current;
     unsaved.current = true;
-    void client.saveLocal(JSON.stringify({ version: 1, ...snapshot } satisfies Saved))
-      .then(() => { if (record.current === snapshot) unsaved.current = false; })
-      .catch(() => { if (alive.current) setSaveError(true); });
+    if (writing.current) return;
+    const snapshot = record.current;
+    writing.current = true;
+    void client.saveLocal(serializeSave(snapshot))
+      .then(() => {
+        writing.current = false;
+        if (record.current === snapshot) unsaved.current = false;
+        else if (alive.current) persist();
+      })
+      .catch(() => { writing.current = false; if (alive.current) setSaveError(true); });
   }
 
   function saveRecord(s: State) {
-    const nextBest = Math.max(record.current.best, s.score), nextTier = Math.max(record.current.bestTier, s.maxTier);
-    if (nextBest !== record.current.best || nextTier !== record.current.bestTier) {
-      record.current = { best: nextBest, bestTier: nextTier }; setBest(nextBest); setBestTier(nextTier);
+    const prev = record.current;
+    const nextBest = Math.max(prev.best, s.score), nextTier = Math.max(prev.bestTier, s.maxTier);
+    if (prev.best > 0 && nextBest > prev.best) sfx.current?.play('best', { delay: 0.75 });
+    if (nextBest !== prev.best || nextTier !== prev.bestTier) {
+      record.current = { ...prev, best: nextBest, bestTier: nextTier }; setBest(nextBest); setBestTier(nextTier);
     } else if (!unsaved.current) return;
     persist();
   }
 
+  /** The on/off setting lives in the same local save as the record. */
+  function toggleSound() {
+    if (!ready) return;
+    const on = !record.current.sound;
+    record.current = { ...record.current, sound: on }; setSound(on);
+    sfx.current?.setEnabled(on);
+    if (on && sfx.current?.unlock()) sfx.current.play('drop');
+    persist();
+  }
+  toggleRef.current = toggleSound;
+
   const start = () => {
     if (paused || !ready) return;
     if (unsaved.current) persist();
-    world.current = createGame(newSeed()); setView(world.current);
+    world.current = createGame(newSeed()); setView(world.current); combo.current = NO_COMBO;
     keys.current.clear(); touch.current.clear(); aim.current = null; dropTap.current = false;
     setStarted(true); setManualPause(false); setShareError(false); canvas.current?.focus();
   };
@@ -186,6 +219,8 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
     <header>
       <div className="brand"><small>RARE FRIENDS / ARCADE 02</small><h1>RARE <span>DROP</span></h1></div>
       <div className="top-actions">
+        <button className="sound-toggle" onClick={toggleSound} disabled={!ready} aria-pressed={sound} data-testid="sound"
+          aria-label={t('サウンド オン/オフ', 'Sound on/off')} title={t('サウンド オン/オフ（M）', 'Sound on/off (M)')}><span aria-hidden="true">♪</span></button>
         <button onClick={() => { setLang(lang === 'ja' ? 'en' : 'ja'); if (started) canvas.current?.focus(); }}>{lang === 'ja' ? 'English' : '日本語'}</button>
         {started && !finished && <button disabled={paused} aria-label={t('一時停止', 'Pause')} onClick={() => setManualPause(true)}>Ⅱ</button>}
       </div>
@@ -216,7 +251,7 @@ function Jar({ friendId, collection = 'generations', client, paused }: GameCompo
               </button>}
             {finished && client.shareScore && <button className="share-score" disabled={paused} onClick={share}>{t('スコアをXでシェア', 'Share score on X')}</button>}
             {shareError && <p role="alert">{t('シェアを開けませんでした。もう一度お試しください。', 'Could not open sharing. Please retry.')}</p>}
-            <p className="keys">{t('タップ / クリック：その位置に落とす　← →：移動　SPACE：落とす', 'Tap / click to drop there · ← → move · SPACE drop')}</p>
+            <p className="keys">{t('タップ / クリック：その位置に落とす　← →：移動　SPACE：落とす　M：サウンド', 'Tap / click to drop there · ← → move · SPACE drop · M sound')}</p>
           </div></div>}
         </div>
         <div className="touch-controls">
