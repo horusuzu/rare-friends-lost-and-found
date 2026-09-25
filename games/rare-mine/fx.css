@@ -36,10 +36,10 @@
   box-shadow:inset 0 0 0 .5cqw #fffa,0 0 0 .6cqw #3a1a5a,0 0 7cqw #ff5ad2,0 1.4cqw 3cqw #000c}
 .win-card .shine{position:absolute;top:-20%;bottom:-20%;left:0;width:30%;background:linear-gradient(90deg,#fff0,#fffc,#fff0);transform:translateX(-150%) skewX(-18deg);
   animation:shine 1.3s var(--ease) .35s infinite}
-.win-title{position:relative;font:900 11cqw/1 var(--display);letter-spacing:.4cqw;color:#c0101c;-webkit-text-stroke:.3cqw #fff;paint-order:stroke fill;
+.win-title{position:relative;white-space:nowrap;font:900 min(11cqw,12vw)/1 var(--display);letter-spacing:.4cqw;color:#c0101c;-webkit-text-stroke:.3cqw #fff;paint-order:stroke fill;
   filter:drop-shadow(0 .5cqw 0 #5a0a00)}
 .win-fx.tier-2 .win-title,.win-fx.tier-3 .win-title{color:#5a0a8a;filter:drop-shadow(0 .5cqw 0 #1a0024)}
-.win-fx.tier-3 .win-title{font-size:13cqw}
+.win-fx.tier-3 .win-title{font-size:min(13cqw,13vw)}
 .win-mult{position:relative;font:900 4.4cqw/1 var(--display);letter-spacing:.5cqw}
 .win-count{position:relative;display:block;min-width:6ch;padding:.3cqw 1.4cqw;border-radius:1cqw;background:#140f0cd8;color:var(--gold-hi);
   font:800 5cqw/1.15 ui-monospace,'SF Mono',Menlo,monospace;font-variant-numeric:tabular-nums}
