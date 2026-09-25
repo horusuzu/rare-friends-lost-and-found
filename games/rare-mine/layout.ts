@@ -1,8 +1,8 @@
 /** Fixed positions in the 256 × 160 pixel mine scene, shared by the renderer and the particle system. */
 export const SCENE_W = 256;
-/** The scene is laid out for 160 rows; taller (portrait) canvases add up to 64 rows of rock ceiling above it. */
+/** The scene is laid out for 160 rows; taller (portrait) canvases add up to 112 rows of rock ceiling above it. */
 export const SCENE_H = 160;
-export const SCENE_H_MAX = 224;
+export const SCENE_H_MAX = 272;
 /** Canvas height that best fills a box of the given aspect ratio (width / height), in steps of 8 rows. */
 export function sceneHeight(aspect: number): number {
   if (!Number.isFinite(aspect) || aspect <= 0) return SCENE_H;

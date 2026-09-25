@@ -10,7 +10,7 @@ import { CART, FLOOR_Y, IMPACT, JAR, ROCK_X, SCENE_H, SCENE_H_MAX, SCENE_W } fro
 
 export { SCENE_W, SCENE_H, sceneHeight } from './layout.ts';
 const CEILING = SCENE_H_MAX - SCENE_H;
-const FRIEND = { x: 142, y: 96, size: 32 } as const;
+const FRIEND = { x: 132, y: 80, size: 48 } as const;
 const MOUND = [6, 6, 6, 5, 5, 4, 4, 3, 2, 2, 1];
 const HEAP = [5, 4, 4, 3, 2, 1];
 
@@ -45,7 +45,24 @@ function drawBackdrop(): HTMLCanvasElement {
   }
   c.fillStyle = P.woodLo; c.fillRect(30, 8, 156, 8); c.fillStyle = P.wood; c.fillRect(30, 9, 156, 5); c.fillStyle = P.woodHi; c.fillRect(30, 9, 156, 1);
   c.fillStyle = P.ink; c.fillRect(117, 16, 1, 6);
+  drawCeiling(c);
   return (backdrop = el);
+}
+
+/** Portrait-only ceiling: stalactites along the top edge and a few embedded crystals. */
+function drawCeiling(c: CanvasRenderingContext2D): void {
+  for (let x = 0; x < SCENE_W; x += 3) {
+    const len = 4 + Math.floor(hash2(x, 1, 41) * 14) * (hash2(x, 2, 43) > 0.55 ? 1 : 0.3);
+    for (let j = 0; j < len; j++) {
+      const w = Math.max(1, Math.round(3 * (1 - j / len)));
+      c.fillStyle = j === 0 ? P.rockDeep : hash2(x, j, 47) > 0.7 ? P.rockHi : P.rockLo;
+      c.fillRect(x + Math.floor((3 - w) / 2), -CEILING + j, w, 1);
+    }
+  }
+  for (let i = 0; i < 9; i++) {
+    const x = 10 + Math.floor(hash2(i, 5, 53) * 236), y = -CEILING + 24 + Math.floor(hash2(i, 6, 59) * (CEILING - 30));
+    c.fillStyle = P.gemLo; c.fillRect(x, y, 3, 2); c.fillStyle = P.gem; c.fillRect(x + 1, y - 1, 1, 2); c.fillStyle = P.gemHi; c.fillRect(x + 1, y - 1, 1, 1);
+  }
 }
 
 /** The rock face: a jagged boulder wall whose shape and gold specks depend on the depth. */
@@ -92,16 +109,16 @@ export function swingAngle(t: number): number {
 let pickCanvas: HTMLCanvasElement | null = null;
 function pickImage(): HTMLCanvasElement {
   if (pickCanvas) return pickCanvas;
-  const el = document.createElement('canvas'); el.width = 24; el.height = 24;
+  const el = document.createElement('canvas'); el.width = 36; el.height = 36;
   const c = el.getContext('2d');
-  if (c) drawSprite(c, PICK, 0, 0, 2);
+  if (c) drawSprite(c, PICK, 0, 0, 3);
   return (pickCanvas = el);
 }
 
 function drawMiner(c: CanvasRenderingContext2D, rows: FriendRows | null, swingT: number, now: number, reduced: boolean): void {
   const bob = !reduced && swingT > 0.08 && swingT < 0.22 ? 1 : 0;
   const x = FRIEND.x, y = FRIEND.y + bob;
-  c.fillStyle = '#0006'; c.fillRect(x + 4, FLOOR_Y - 1, 24, 2);
+  c.fillStyle = '#0006'; c.fillRect(x + 6, FLOOR_Y - 1, FRIEND.size - 12, 2);
   if (rows) {
     const w = rows[0]?.length ?? 16, scale = Math.max(1, Math.floor(FRIEND.size / w)), size = w * scale;
     drawFriend(c, rows, x + (FRIEND.size - size) / 2, FLOOR_Y - rows.length * scale, scale);
@@ -109,8 +126,8 @@ function drawMiner(c: CanvasRenderingContext2D, rows: FriendRows | null, swingT:
     c.fillStyle = P.ink; c.fillRect(x + 8, y + 8, 16, 24);
   }
   const angle = reduced ? (swingT < 0.2 ? 0.55 : -0.5) : swingAngle(swingT);
-  c.save(); c.translate(x + 26, y + 20); c.rotate(angle);
-  c.imageSmoothingEnabled = false; c.drawImage(pickImage(), -2, -22);
+  c.save(); c.translate(x + 38, y + 30); c.rotate(angle);
+  c.imageSmoothingEnabled = false; c.drawImage(pickImage(), -3, -33);
   c.restore();
   if (!reduced && swingT > 0.15 && swingT < 0.2) { c.fillStyle = P.goldHi; c.fillRect(IMPACT.x - 2, IMPACT.y - 1, 3, 3); }
   void now;

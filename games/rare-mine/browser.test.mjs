@@ -46,7 +46,7 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     assert.ok(Math.abs(wb.width - bb.width) < 1 && Math.abs(wb.height - bb.height) < 1, 'Withdraw and Bet are equal-sized');
     const sbox = await screen.boundingBox(); assert.ok(sbox.width >= 240, `stage width ${sbox.width}`);
     const ratio = sbox.width / sbox.height;
-    assert.ok(ratio > 256 / 224 - 0.02 && ratio < 1.62, `stage shape ${ratio}`);
+    assert.ok(ratio > 256 / 272 - 0.02 && ratio < 1.62, `stage shape ${ratio}`);
 
     // The Friend mines on its own.
     await until('auto strikes', async () => await num('strikes') >= 2 && await num('pot') > 0);
@@ -71,6 +71,7 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     let wins = 0, losses = 0, maxStreak = 0, sawBet = false, sawBurn = false;
     for (let round = 0; round < 40 && !(wins && losses && (maxStreak >= 2 || round >= 14)); round++) {
       await until('pot to bet', async () => await num('pot') > 0 && await attr('phase') === 'mine');
+      for (let n = 0; n < 12 && await num('pot') < 12; n++) await rock();
       await tap('bet');
       await until('odds shown', async () => await attr('phase') === 'confirm');
       await game.getByTestId('odds').getByText('勝率45%・勝てば2倍・負ければ全額バーン', { exact: true }).waitFor();
