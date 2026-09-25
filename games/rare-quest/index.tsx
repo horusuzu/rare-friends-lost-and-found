@@ -123,11 +123,21 @@ function Quest({ friendId, collection = 'generations', client, paused }: GameCom
     const up = (e: KeyboardEvent) => { const dir = DIR_KEYS[e.key.toLowerCase()]; if (dir) keyDirs.current = keyDirs.current.filter(d => d !== dir); };
     window.addEventListener('keydown', down); window.addEventListener('keyup', up);
     window.addEventListener('blur', blur); document.addEventListener('visibilitychange', visibility);
+    // iOS can freeze the page without a visibilitychange; pagehide pauses as well.
+    window.addEventListener('pagehide', blur);
     return () => {
       release();
       window.removeEventListener('keydown', down); window.removeEventListener('keyup', up);
       window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', visibility);
+      window.removeEventListener('pagehide', blur);
     };
+  }, []);
+  // Audio: iOS Safari only resumes an AudioContext from touchend/pointerup/click, so those gestures unlock it.
+  useEffect(() => {
+    const unlock = () => { if (!game.current || !soundOn.current) return; ensureAudio(); beeper.current?.unlock(); };
+    const GESTURES = ['pointerup', 'touchend', 'keydown'] as const;
+    for (const type of GESTURES) window.addEventListener(type, unlock, true);
+    return () => { for (const type of GESTURES) window.removeEventListener(type, unlock, true); };
   }, []);
   useEffect(() => { if (!active) { keyDirs.current = []; padDir.current = null; } }, [active]);
   useEffect(() => () => { beeper.current?.close(); beeper.current = null; }, []);
@@ -243,7 +253,9 @@ function Quest({ friendId, collection = 'generations', client, paused }: GameCom
 
   const battleUi = scene?.k === 'battle' ? scene.ui : '';
   const partyTypes = s ? s.party.map(m => speciesOf(m).type) : [];
-  return <section className="quest" lang={lang} aria-label="Rare Quest">
+  /** Long-press must not open the browser menu or the iOS callout over the screen and the pad. */
+  const noMenu = (e: React.SyntheticEvent) => e.preventDefault();
+  return <section className="quest" lang={lang} aria-label="Rare Quest" onContextMenu={noMenu}>
     <header>
       <div className="brand"><h1>RARE <span>QUEST</span></h1><small>{tt('あいぼうは きみの Friend', 'Starring your own Friend')}</small></div>
       <div className="status" aria-label={tt('じょうたい', 'Status')}>

@@ -48,6 +48,15 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-qu
     for (let i = 0; i < 10 && await attr('scene') === 'talk'; i++) await tapA();
     assert.equal(await attr('scene'), 'world'); assert.equal(await attr('map'), 'moegi');
 
+    // After a lost battle the Friend wakes up at home: walk out of the door, across the village and north to the trail.
+    async function leaveHome() {
+      await hold('left', async () => Number(await attr('x')) <= 2, 5000);
+      await hold('down', async () => Number(await attr('y')) >= 5, 5000);
+      await hold('right', async () => Number(await attr('x')) >= 3, 5000);
+      await hold('down', async () => await attr('map') === 'moegi', 5000);
+      await hold('right', async () => Number(await attr('x')) >= 9, 5000);
+      await hold('up', async () => await attr('map') === 'wakaba' || await attr('scene') !== 'world');
+    }
     // Walk north out of the village into the Sprout Trail.
     await hold('up', async () => await attr('map') === 'wakaba' || await attr('scene') !== 'world');
     await shot('world');
@@ -56,6 +65,7 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-qu
     for (let battle = 0; battle < 3 && !['win', 'caught'].includes(result); battle++) {
       let dir = 'up'; const trail = [];
       for (let n = 0; n < 150 && await attr('scene') === 'world'; n++) {
+        if (await attr('map') === 'home') { await leaveHome(); continue; }
         if (await attr('map') === 'moegi') { await hold('up', async () => await attr('map') === 'wakaba' || await attr('scene') !== 'world'); continue; }
         const y = Number(await attr('y'));
         // Grass rows 21-23 at x=9; overshooting north is harmless, south leads back to the village.

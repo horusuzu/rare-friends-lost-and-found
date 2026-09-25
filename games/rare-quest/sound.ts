@@ -11,10 +11,10 @@ const CUES: Readonly<Record<Sfx, readonly Note[]>> = {
   badge: [[523, 0.08], [659, 0.08], [784, 0.08], [1047, 0.08], [784, 0.08], [1047, 0.2]], run: [[392, 0.05], [294, 0.05], [196, 0.08]],
 };
 
-export interface Beeper { play(id: Sfx): void; close(): void }
+export interface Beeper { play(id: Sfx): void; unlock(): void; close(): void }
 
 export function createBeeper(): Beeper | null {
-  const Context = globalThis.AudioContext;
+  const Context = globalThis.AudioContext ?? (globalThis as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!Context) return null;
   try {
     const ctx = new Context();
@@ -31,6 +31,8 @@ export function createBeeper(): Beeper | null {
           at += len;
         }
       },
+      /** Resume from a user gesture; iOS Safari only allows this from touchend/pointerup/click. */
+      unlock() { if (ctx.state === 'suspended') void ctx.resume().catch(() => undefined); },
       close() { void ctx.close().catch(() => undefined); },
     };
   } catch {

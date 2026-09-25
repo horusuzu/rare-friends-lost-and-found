@@ -119,6 +119,7 @@ node node_modules/typescript/bin/tsc -p games/rare-quest/tsconfig.json
 node scripts/dev-game.mjs check games/rare-quest
 node --test --experimental-test-coverage games/rare-quest/engine-*.test.mjs
 QUEST_SIZE='[[390,844]]' node games/rare-quest/browser.test.mjs
+MOBILE_SIZE='[[390,664]]' node games/rare-quest/mobile.test.mjs   # phones: 360×640, 375×667, 390×664, 430×740, 664×390 by default (touch, DPR 3)
 QUEST_SIZE='[390]' node games/rare-quest/genesis-browser.test.mjs
 node scripts/dev-game.mjs build games/rare-quest --outdir release-quest
 ```
