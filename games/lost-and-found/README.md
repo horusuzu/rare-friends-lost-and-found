@@ -10,6 +10,22 @@ A phone-first companion and island-building game. Your verified Genesis #597 or 
 - Build a flower garden, a bridge to the fourth destination, or a shared bench. Flowers grow after sleep and appear in the room; the bench improves walks.
 - Eight collectible postcards, a bounded journal, friendship stages and contextual greetings retain memories of the actual selected Friend.
 
+## Sound
+
+The game had no audio before (the ♪ over the Friend is a walk emote, not a mute switch). It now has
+gentle synthesised WebAudio cues (soft sine/triangle tones and a little filtered noise; no audio
+files): feeding, walks, bedtime, talking to your Friend, setting out, finding things on an outing,
+coming home, building, picking flowers, a coin into the piggy bank when you open it (a few coins when
+unclaimed rewards grew since the last check) and a soft bell for menus and confirmations.
+
+- **♪ button** beside the language switch (accessible name 効果音 / Sound effects, `aria-pressed`
+  shows the state), or **M** (ignored while typing a name or while a dialog is open).
+- The setting is saved in this NFT's care data (`sound`), like the language. Saves from before the
+  setting load with sound on; a save with a malformed sound value is treated like any unreadable save.
+  Like every other change, the switch waits while saving or while the host menu is open.
+- The AudioContext is created on the first tap or key press; nothing plays while paused or while the
+  page is hidden. At most six cues play at once; every tone fades in and out.
+
 ## Run and build
 
 Node 22+: `npm ci`, `npm run build`, then `node scripts/dev-game.mjs dev games/lost-and-found` for development. For public home-screen packaging: `node scripts/build-island-life.mjs /path/to/NEW-empty-directory`. Use a new dedicated output directory each build (the PWA packager adds nonstandard files after the SDK build).
@@ -28,8 +44,8 @@ Core care, materials, construction and memory collection are free simulated prog
 
 ## Validation and assets
 
-`node --test games/lost-and-found/life.test.mjs games/lost-and-found/pwa.test.mjs`
-`node games/lost-and-found/life-browser.test.mjs`
+`node --test games/lost-and-found/life.test.mjs games/lost-and-found/sound.test.mjs games/lost-and-found/life-i18n.test.mjs games/lost-and-found/pwa.test.mjs`
+`node games/lost-and-found/life-browser.test.mjs` (set `LOST_FOUND_SIZE`, for example `[[320,568]]`, to run one viewport per process; it also clicks ♪, presses M and checks the setting after a reload)
 `npx tsc -p games/lost-and-found/tsconfig.json`
 
 Original room, scenery, app icon and stories. Canonical selected NFT sprites from FriendSDK. Existing delivery model/artwork remain reference files but are not the active experience. FriendSDK code: LICENSE. Artwork: NOTICE.md. No third-party game characters, logos or proprietary assets are used.

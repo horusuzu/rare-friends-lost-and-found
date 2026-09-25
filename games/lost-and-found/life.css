@@ -9,3 +9,7 @@
 .wallet-amounts>span{display:block}.close-dialog{position:sticky;top:0;z-index:2;box-shadow:0 1px 6px #faf5e5}
 
 .language-toggle{margin-left:auto;border:1px solid #bcc5a1;border-radius:999px;padding:10px 14px;background:#faf6e8;color:#38584b;font:inherit;white-space:nowrap;cursor:pointer}.language-toggle:disabled{opacity:.5;cursor:default}.life-header .gear{flex-shrink:0}.life-header{gap:10px}.life-header>div{min-width:0}.life-app[lang="en"] .home-actions small{line-height:1.4}.life-app[lang="en"] .life-nav button{font-size:12px}
+.life-header .sound-toggle{position:relative;flex-shrink:0;width:44px;height:44px;border-radius:50%;background:#e9ecda;color:#38584b;font-size:20px;line-height:1;display:grid;place-items:center;border:1px solid #bcc5a1!important}
+.life-header .sound-toggle.off{color:#98a291;background:#f3f0e0}.life-header .sound-toggle.off::after{content:'';position:absolute;left:11px;right:11px;top:50%;height:2px;border-radius:1px;background:#c98f7c;transform:rotate(-40deg)}
+/* Phones: caption and controls share the top row so the title keeps the full width below. */
+@media(max-width:650px){.life-header{flex-wrap:wrap;row-gap:4px;column-gap:8px}.life-header>div{display:contents}.life-header .tiny{flex:1 1 0;min-width:0;align-self:center}.life-header h1{order:5;flex-basis:100%}.life-header .language-toggle{margin-left:0}}

@@ -67,7 +67,7 @@ const english: Record<string, string> = {
  '新しい暮らしを始める（次の保存で上書き）':'Start fresh (replaces old data on next save)',
  '画像を作れませんでした。':'Could not create the picture.',
  'はじめまして':'Just met', '気になるともだち':'Getting to know you', 'なかよし':'Close friends', '大切な相棒':'Dear companions', '家族みたいなふたり':'Like family',
- '設定':'Settings', '保存中…':'Saving…', '未保存':'Not saved', '保存済み':'Saved', 'はじめての朝':'Our first morning',
+ '設定':'Settings', '効果音':'Sound effects', '効果音 オン/オフ（M）':'Sound effects on/off (M)', '保存中…':'Saving…', '未保存':'Not saved', '保存済み':'Saved', 'はじめての朝':'Our first morning',
  'おなか':'Fullness', 'げんき':'Energy', 'あなたと暮らす、世界にひとりのFriend':'Your one-of-a-kind Friend, sharing life with you',
  '暮らしの選択':'Choose our day', '道の途中で…':'Along the way…', 'ふたりの、今日のできごと':'Our little story today',
  'おみやげ':'Souvenirs', 'おみやげを持って帰る':'Bring the souvenirs home', '帰ったら、今日の思い出がアルバムに残ります。':'When we get home, today’s memory goes into our album.',

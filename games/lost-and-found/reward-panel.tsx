@@ -11,7 +11,7 @@ function Amounts({value,title,prefix='',language='ja'}:{language?:Language;value
  {!value.active&&<p className="hint">{t("新しい報酬の割り当ては停止中です。以前に発生した未受取の報酬が残っている場合は、上に表示されます。")}</p>}
  <details><summary>{t("確認したお財布")}</summary><code>{value.walletAddress}</code><small>{t("確認ブロック")} {String(value.blockNumber)}</small></details></section>;
 }
-export function RewardPanel({client,friendId,previous,onRead,paused,language='ja'}:{language?:Language;client:GameClient;friendId:bigint;previous:FriendRewardsSnapshot|null;onRead:(value:FriendRewardsSnapshot)=>void;paused:boolean}){
+export function RewardPanel({client,friendId,previous,onRead,onIncrease,paused,language='ja'}:{language?:Language;client:GameClient;friendId:bigint;previous:FriendRewardsSnapshot|null;onRead:(value:FriendRewardsSnapshot)=>void;onIncrease?:()=>void;paused:boolean}){
  const t=(text:string)=>translate(text,language);
  const [value,setValue]=useState(previous),[loading,setLoading]=useState(false),[error,setError]=useState(false),[increased,setIncreased]=useState(false);
  const alive=useRef(false),busy=useRef(false),last=useRef(previous);
@@ -19,7 +19,8 @@ export function RewardPanel({client,friendId,previous,onRead,paused,language='ja
   if(paused||busy.current)return;busy.current=true;setLoading(true);setError(false);setIncreased(false);
   try{if(!client.readRewards)throw Error('Unavailable');const next=await client.readRewards();if(!alive.current)return;if(next.friendId!==friendId)throw Error('Friend changed');
    const old=last.current;const primary=next.genesis??next;const oldPrimary=next.genesis?old?.genesis:old;
-   setIncreased(Boolean(oldPrimary&&(primary.claimableRF>oldPrimary.claimableRF||primary.claimableWETH>oldPrimary.claimableWETH)));last.current=next;setValue(next);onRead(next);
+   const grew=Boolean(oldPrimary&&(primary.claimableRF>oldPrimary.claimableRF||primary.claimableWETH>oldPrimary.claimableWETH));
+   setIncreased(grew);last.current=next;setValue(next);onRead(next);if(grew)onIncrease?.();
   }catch{if(alive.current)setError(true);}finally{if(alive.current){setLoading(false);busy.current=false;}}
  }
  useEffect(()=>{alive.current=true;void refresh();return()=>{alive.current=false;};},[client,friendId]);
