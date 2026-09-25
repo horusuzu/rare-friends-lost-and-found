@@ -148,11 +148,11 @@ kbd{font:700 .75em ui-monospace,monospace;padding:0 .3em;border-radius:.3em;back
   .stats{align-self:start}.stats dl{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (min-aspect-ratio:5/4) and (max-height:500px){
-  :root{--side:260px}.brand small,.mine footer{display:none}.brand h1{font-size:18px}.mine{gap:4px;padding-top:4px;grid-template-rows:auto minmax(0,1fr) auto auto minmax(0,1fr);
+  :root{--side:260px}.brand small,.mine footer{display:none}.brand h1{font-size:18px}.mine{gap:4px;padding-top:4px;grid-template-rows:auto minmax(0,1fr) auto minmax(0,auto) minmax(0,1fr);
     grid-template-areas:"head head" "stage ." "stage act" "stage stats" "stage ."}
   .actions{grid-template-columns:repeat(2,minmax(0,1fr))}.actions button{min-height:52px}.actions b{font-size:16px}.actions small{font-size:10px}
   .stats{padding:6px 8px}.stats dd{font-size:12px}.stats .unit{margin-top:3px}.stats .share{margin-top:4px}
-  .stats dl{gap:1px 8px}.stats dd{line-height:1.15}.mode-bar{margin-top:3px;font-size:9px;line-height:1.25}
+  .stats{align-self:stretch;min-height:0;overflow-y:auto;overscroll-behavior:contain}.stats dl{gap:1px 8px}.stats dd{line-height:1.15}.mode-bar{margin-top:3px;font-size:9px;line-height:1.25}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 .mine.calm *{transition:none!important;animation:none!important}
