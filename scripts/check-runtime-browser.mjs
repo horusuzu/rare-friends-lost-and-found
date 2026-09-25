@@ -143,7 +143,7 @@ try {
     } else {
       await page.getByRole("button", { name: /^(Refresh Friends|Retry loading Friends)$/ }).waitFor();
       // Wait for a terminal state after wallet connection, not the initial empty picker.
-      if (mode === "rpc-error") await page.getByRole("alert").filter({ hasText: /Fixture RPC unavailable|could not/i }).waitFor({ timeout: 20_000 });
+      if (mode === "rpc-error") await page.getByRole("alert").filter({ hasText: /Fixture RPC unavailable|could not|読み込めません/i }).waitFor({ timeout: 20_000 });
       else if (mode === "unhardwired") await page.getByText("1 Friend hidden: not hardwired (generation 0). Playing requires generation 1 or higher.", { exact: true }).waitFor();
       else await page.getByText("No Rare Friends Generations NFTs found in this wallet on Robinhood.", { exact: true }).waitFor();
       assert.equal(await page.getByText("No playable Friends found.", { exact: true }).count(), 0);
