@@ -3,7 +3,7 @@ import type { GameComponentProps } from '@rarefriends/friendsdk/runtime';
 import { createFriendReader, createGenesisReader, type GenerationSprites } from '@rarefriends/friendsdk/sprites';
 import { newGame, onStairs, press, saveResult, type Button } from './game.ts';
 import { loadGame, serialize } from './save.ts';
-import { HUD_H, SCREEN_H, SCREEN_W, drawGame } from './render.ts';
+import { BASE_VIEW, HUD_H, TILE, drawGame, viewFor, type View } from './render.ts';
 import { drawFriend, type FriendRows } from './art.ts';
 import { createBeeper, type Beeper } from './sound.ts';
 import { UNIDENTIFIED, ITEMS, type Dir } from './data.ts';
@@ -43,6 +43,9 @@ function Delve({ friendId, collection = 'generations', client, paused }: GameCom
   const [manualPause, setManualPause] = useState(false), [sound, setSound] = useState(true);
   const [reduced, setReduced] = useState(() => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
   const [saves, setSaves] = useState(0), [suspending, setSuspending] = useState(false);
+  /** Tiles on screen: the reference 15 × 11, or on a phone's portrait stage 13 columns and enough rows to fill it. */
+  const [tiles, setTiles] = useState<View>(BASE_VIEW);
+  const stage = useRef<HTMLDivElement>(null);
   const game = useRef<GameState | null>(null), canvas = useRef<HTMLCanvasElement>(null);
   const hold = useRef<Hold>(idleHold());
   const beeper = useRef<Beeper | null>(null), soundOn = useRef(true), handledSave = useRef(0), hurtAt = useRef(-10), reducedRef = useRef(reduced);
@@ -130,6 +133,9 @@ function Delve({ friendId, collection = 'generations', client, paused }: GameCom
     const release = () => { hold.current = idleHold(); };
     const blur = () => { release(); if (game.current) setManualPause(true); };
     const visibility = () => { if (document.hidden) blur(); };
+    // iOS only starts audio from a touchend / pointerup / click / key press: create and resume the context there.
+    const unlock = () => { ensureAudio(); beeper.current?.wake(); };
+    const unlockOn = ['touchend', 'pointerup', 'click', 'keydown'] as const;
     const down = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase();
       const onButton = (e.target as HTMLElement)?.closest?.('button');
@@ -148,14 +154,27 @@ function Delve({ friendId, collection = 'generations', client, paused }: GameCom
       if (pad) endSolo(pad); else if (chord) endChord(chord); else if (solo) endSolo(solo);
     };
     window.addEventListener('keydown', down); window.addEventListener('keyup', up);
-    window.addEventListener('blur', blur); document.addEventListener('visibilitychange', visibility);
+    for (const type of unlockOn) window.addEventListener(type, unlock, { passive: true });
+    window.addEventListener('blur', blur); window.addEventListener('pagehide', blur); document.addEventListener('visibilitychange', visibility);
     return () => {
       release();
       window.removeEventListener('keydown', down); window.removeEventListener('keyup', up);
-      window.removeEventListener('blur', blur); document.removeEventListener('visibilitychange', visibility);
+      for (const type of unlockOn) window.removeEventListener(type, unlock);
+      window.removeEventListener('blur', blur); window.removeEventListener('pagehide', blur); document.removeEventListener('visibilitychange', visibility);
     };
   }, []);
   useEffect(() => { if (!active) hold.current = idleHold(); }, [active]);
+  // Size the camera to the stage box (phones in portrait get bigger tiles and more rows instead of empty space).
+  useEffect(() => {
+    const el = stage.current;
+    if (!el || typeof ResizeObserver !== 'function') return;
+    const fit = () => {
+      const { width, height } = el.getBoundingClientRect(), next = viewFor(width, height);
+      setTiles(cur => cur.cols === next.cols && cur.rows === next.rows ? cur : next);
+    };
+    const observer = new ResizeObserver(fit); observer.observe(el); fit();
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => () => { beeper.current?.close(); beeper.current = null; }, []);
 
   useEffect(() => {
@@ -224,7 +243,8 @@ function Delve({ friendId, collection = 'generations', client, paused }: GameCom
   const s = view, run = s?.run ?? null;
   const unknown = s && run ? s.hero.bag.filter(it => UNIDENTIFIED.includes(ITEMS[it.k].kind) && !run.known.includes(it.k)).length : 0;
   const result = s?.scene.k === 'summary' ? s.scene.result : '';
-  return <section className={`delve${reduced ? ' calm' : ''}`} lang={lang} aria-label="Rare Delve">
+  const canvasW = tiles.cols * TILE, canvasH = tiles.rows * TILE;
+  return <section className={`delve${reduced ? ' calm' : ''}`} lang={lang} aria-label="Rare Delve" onContextMenu={e => e.preventDefault()}>
     <header>
       <div className="brand"><h1>RARE <span>DELVE</span></h1><small>{tt('きみの Friendが もぐる ダンジョン', 'Your Friend goes delving')}</small></div>
       <div className="status" aria-label={tt('じょうたい', 'Status')}>
@@ -236,14 +256,15 @@ function Delve({ friendId, collection = 'generations', client, paused }: GameCom
         {started && <button disabled={paused} aria-label={tt('一時停止', 'Pause')} onClick={() => { hold.current = idleHold(); setManualPause(true); }}>Ⅱ</button>}
       </div>
     </header>
-    <div className="stage">
+    <div className="stage" ref={stage}>
       <div className="screen" data-testid="screen" data-scene={s?.scene.k ?? 'title'} data-floor={run?.floor ?? 0} data-x={s?.hero.x ?? ''} data-y={s?.hero.y ?? ''}
         data-seed={run?.seed ?? ''} data-turn={run?.turn ?? 0} data-hp={s?.hero.hp ?? ''} data-maxhp={s?.hero.maxHp ?? ''} data-level={s?.hero.level ?? ''}
         data-full={s?.hero.full ?? ''} data-gold={s?.hero.gold ?? ''} data-purse={s?.meta.purse ?? ''} data-bag={s?.hero.bag.length ?? 0} data-unknown={unknown}
         data-showmap={String(!!s?.showMap)} data-turnmode={String(!!s?.turnMode)} data-onstairs={String(!!s && onStairs(s))} data-result={result}
         data-paused={String(!active)} data-saves={saves} data-save-error={String(!!s?.saveError)} data-lang={lang} data-reduced={String(reduced)}
-        style={{ ['--hud' as string]: `${HUD_H / SCREEN_W * 100}cqw` }}>
-        <canvas ref={canvas} width={SCREEN_W} height={SCREEN_H} aria-label={tt('ゲーム画面', 'Game screen')} role="img" />
+        data-cols={tiles.cols} data-rows={tiles.rows}
+        style={{ ['--hud' as string]: `${HUD_H / canvasW * 100}cqw`, ['--cols' as string]: tiles.cols, ['--rows' as string]: tiles.rows }}>
+        <canvas ref={canvas} width={canvasW} height={canvasH} aria-label={tt('ゲーム画面', 'Game screen')} role="img" />
         {s && s.scene.k !== 'summary' && <Hud s={s} lang={lang} />}
         {s && <Panels s={s} lang={lang} active={active} choose={choose} press={b => { pressButton(b); }} />}
         {(!started || error) && <div className="title">

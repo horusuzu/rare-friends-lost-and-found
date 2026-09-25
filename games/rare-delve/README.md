@@ -5,7 +5,8 @@ Your Friend lives in a small town above **Lantern Hollow**, a ten-floor cave tha
 every dive. Walk the grid in eight directions, fight what lurks there, guess what the unmarked
 bottles and scrolls do, keep your belly full, and carry the **Heart Lantern** home from floor 10.
 The hero is your own Friend, drawn from its canonical on-chain sprite. Built with FriendSDK 0.1.2,
-React and a deterministic TypeScript engine rendered to a scrolling 240 × 176 canvas.
+React and a deterministic TypeScript engine rendered to a scrolling 15 × 11-tile (240 × 176) canvas;
+phones in portrait get 13 columns of bigger tiles and as many rows as fill the screen.
 
 ## Play
 
@@ -156,6 +157,26 @@ Reduced motion follows the system preference and can be toggled in the pause men
 idle bob, the lantern glow and the damage flash. Menus are real buttons with the current choice
 marked, the HP bar exposes `role="meter"`, and all pad and header controls are at least 44 px.
 Layouts are checked at 320 × 568, 390 × 844, 844 × 390, 960 × 640 and 1100 × 900 with no page overflow.
+The AudioContext is created and resumed on the first touchend, pointer-up, click or key press (iOS
+only unlocks audio from those), including after iOS interrupts it.
+
+## Phones
+
+The camera is presentation only (the engine never sees it). `viewFor` in `render.ts` sizes it to the
+stage: wide boxes and anything wider than 560 px keep the reference 15 × 11 tiles; a phone's portrait
+stage gets 13 columns (tiles about 15 % larger, 26–32 px on 360–430 px phones) and as many whole rows
+as fill its height (11–23), so the map uses the space that used to be empty above and below it. The
+town backdrop stands on the bottom edge under a taller sky. The 8-way pad, A/B and Bag/Map/Turn stay
+in the lower thumb zone in portrait and beside the view in landscape. Text in play is at least 12 px
+(the simulated-gold note wraps rather than truncates); the map canvas takes no browser gestures
+(`touch-action: none`), the view has no double-tap zoom, there is no long-press menu or text
+selection, and the documents have `overscroll-behavior: none`. The game pauses on blur,
+`visibilitychange` and `pagehide`. `host.css` makes the host toolbar one 48 px row (44 px targets,
+12 px text) and edge to edge on phones, with a `100vh` fallback for `100dvh`. `mobile.test.mjs` checks
+360 × 640, 375 × 667, 390 × 664, 430 × 740 and 664 × 390 with phone emulation (touch, DPR 3, mobile
+UA): no scroll in either document, the view at least 50 % of the viewport height in portrait (60 %
+landscape) with enlarged tiles, every pad control a 44 px target (48 px for A/B) below or beside the
+view and above the host toolbar, the town, bag and map overlays, a touch step and pause.
 
 ## Development and verification
 
@@ -167,6 +188,7 @@ node scripts/dev-game.mjs check games/rare-delve
 node --test games/rare-delve/engine-*.test.mjs
 DELVE_SIZE='[[390,844]]' node games/rare-delve/browser.test.mjs
 DELVE_SIZE='[390]' node games/rare-delve/genesis-browser.test.mjs
+DELVE_SIZE='[[390,664]]' node games/rare-delve/mobile.test.mjs
 node scripts/dev-game.mjs build games/rare-delve --outdir release-delve
 ```
 

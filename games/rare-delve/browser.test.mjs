@@ -84,7 +84,8 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-de
     await game.getByRole('button', { name: 'はじめから', exact: true }).click();
     await until('town', async () => await attr('scene') === 'town');
 
-    // Layout: every pad control is a 44px target clear of the host wallet toolbar; the screen keeps its 15:11 shape.
+    // Layout: every pad control is a 44px target clear of the host wallet toolbar; the screen keeps its canvas's shape
+    // (15 x 11 tiles, or 13 columns and more rows on a phone's portrait stage).
     const wallet = await page.getByRole('button', { name: 'Open Friend wallet', exact: true }).boundingBox();
     const pads = ['pad-n', 'pad-ne', 'pad-e', 'pad-se', 'pad-s', 'pad-sw', 'pad-w', 'pad-nw', 'pad-wait', 'pad-a', 'pad-b', 'pad-menu', 'pad-map', 'pad-turn', 'mute'];
     for (const id of pads) {
@@ -93,7 +94,9 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-de
       assert.ok(box.y + box.height <= wallet.y + 1, `${id} clear of host controls`);
     }
     const sbox = await screen.boundingBox(); assert.ok(sbox.width >= 240, `screen width ${sbox.width}`);
-    assert.ok(Math.abs(sbox.width / sbox.height - 240 / 176) < 0.02, 'screen keeps the 240x176 shape');
+    const [cols, rows] = [await num('cols'), await num('rows')];
+    assert.ok((cols === 15 && rows === 11) || (cols === 13 && rows >= 11 && width <= 560 && height > width), `view ${cols}x${rows}`);
+    assert.ok(Math.abs(sbox.width / sbox.height - cols / rows) < 0.02, `screen keeps the ${cols * 16}x${rows * 16} shape`);
 
     // Town: the shop counter opens and closes; gold is labelled as simulated.
     await shot('town');

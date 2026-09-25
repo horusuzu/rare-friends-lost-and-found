@@ -12,7 +12,12 @@ const CUES: Readonly<Record<Sfx, readonly Note[]>> = {
   buy: [[1047, 0.05], [1319, 0.08]], error: [[160, 0.08]], confirm: [[880, 0.03]], cancel: [[440, 0.04]],
 };
 
-export interface Beeper { play(id: Sfx): void; close(): void }
+export interface Beeper {
+  play(id: Sfx): void;
+  /** Resume a suspended (or iOS-interrupted) context; call it from a touchend / pointerup / click / keydown handler. */
+  wake(): void;
+  close(): void;
+}
 
 export function createBeeper(): Beeper | null {
   const Context = globalThis.AudioContext;
@@ -20,9 +25,11 @@ export function createBeeper(): Beeper | null {
   try {
     const ctx = new Context();
     const master = ctx.createGain(); master.gain.value = 0.05; master.connect(ctx.destination);
+    const wake = () => { if (ctx.state !== 'running' && ctx.state !== 'closed') void ctx.resume().catch(() => undefined); };
     return {
+      wake,
       play(id) {
-        if (ctx.state === 'suspended') void ctx.resume().catch(() => undefined);
+        wake();
         let at = ctx.currentTime + 0.01;
         for (const [freq, len] of CUES[id]) {
           const osc = ctx.createOscillator(), gain = ctx.createGain();
