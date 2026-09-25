@@ -7,7 +7,7 @@ import { betOutcome } from './economy.ts';
 const launch = chromium.launch.bind(chromium);
 if (process.env.MINE_CHROMIUM) chromium.launch = o => launch({ ...o, executablePath: process.env.MINE_CHROMIUM });
 const sizes = process.env.MINE_SIZE ? JSON.parse(process.env.MINE_SIZE) : [[320, 568], [390, 844], [844, 390], [960, 640], [1100, 900]];
-const shots = new Set([390, 1100]);
+const shots = new Set(process.env.MINE_SHOT_ALL ? sizes.map(([w]) => w) : [390, 1100]);
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 for (const [width, height] of sizes) console.log(await testGame('./games/rare-mine', {
