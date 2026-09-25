@@ -50,4 +50,22 @@ for(const [width,height] of sizes)console.log(await testGame('./games/rare-stick
  const wallet=await page.getByRole('button',{name:'Open Friend wallet',exact:true}).boundingBox();assert.ok(wallet.y+wallet.height<=height,'host controls within screen');
  assert.equal(await game.locator('.stickers').evaluate(e=>e.scrollWidth>e.clientWidth+1),false,'no horizontal overflow');
  assert.equal(await game.locator('body').evaluate(e=>e.scrollWidth>innerWidth),false);
+ // Sound: the ♪ toggle flips aria-pressed, M toggles it (not while typing), and the choice survives a reload.
+ const sound=game.getByRole('button',{name:'Sound effects',exact:true});assert.equal(await sound.getAttribute('aria-pressed'),'true','sound starts on');
+ const overlaps=(a,b)=>a.x<b.x+b.width&&b.x<a.x+a.width&&a.y<b.y+b.height&&b.y<a.y+a.height;
+ const checkToggle=async()=>{const s=await game.locator('.sound-toggle').boundingBox(),l=await game.locator('.lang').boundingBox(),h=await game.locator('.brand').boundingBox(),tabs=await game.locator('.tabs').boundingBox();
+  assert.ok(s.width>=44&&s.height>=44,'sound toggle is at least 44px');assert.ok(s.x>=0&&s.x+s.width<=width&&s.y>=0&&s.y+s.height<=height,'sound toggle on screen');
+  for(const [name,box] of [['language',l],['title',h],['tabs',tabs]])assert.ok(!overlaps(s,box),`sound toggle clear of the ${name}`);};
+ await checkToggle();
+ await sound.click();assert.equal(await sound.getAttribute('aria-pressed'),'false','click turns sound off');
+ await page.keyboard.press('m');assert.equal(await sound.getAttribute('aria-pressed'),'true','M turns it back on');
+ await game.getByRole('button',{name:/^Trade/}).click();await game.getByRole('textbox',{name:"Friend's trade code"}).focus();await page.keyboard.type('m');
+ assert.equal(await sound.getAttribute('aria-pressed'),'true','typing m in a code field leaves sound alone');
+ await sound.click();assert.equal(await sound.getAttribute('aria-pressed'),'false');
+ const saved=()=>page.evaluate(()=>Object.keys(localStorage).some(k=>k.startsWith('friendsdk:local-preview')&&JSON.parse(localStorage.getItem(k)).sound===false));
+ for(let i=0;i<100&&!(await saved());i++)await new Promise(r=>setTimeout(r,50));assert.ok(await saved(),'sound off saved with the book');
+ await page.reload();await page.getByRole('button',{name:/^Connect (wallet|Browser wallet)$/}).click();await page.getByRole('button',{name:/^Friend #7730/}).click();
+ const soundJa=game.getByRole('button',{name:'効果音',exact:true});await soundJa.waitFor();
+ assert.equal(await soundJa.getAttribute('aria-pressed'),'false','sound stays off after a reload');await checkToggle();
+ assert.equal(await game.locator('.pocket:not(.empty-pocket)').count(),5,'the book itself is unchanged');
 }}));

@@ -3,6 +3,7 @@ import { DECK_SIZE, ELEMENTS, battle, battleSeed, cardStats, decodeBattle, encod
 import { addChallenge, hasFought, markFought, recordBattle, recordBurn, stickerName, takeChallenge, type Album, type Owner, type Sticker } from './album.ts';
 import { CardCanvas } from './card-canvas.tsx';
 import type { Sprite } from './art.ts';
+import { hitCue, roundCue, verdictCue, type CueId } from './sound.ts';
 
 type Lang = 'ja' | 'en';
 export interface BattleTabProps {
@@ -11,6 +12,8 @@ export interface BattleTabProps {
   /** Spends one RF ticket through the SDK (buy if needed → play → settle). Resolves false if cancelled or failed. */
   burnTicket: () => Promise<boolean>; ticketLabel: string; burnedLabel: string;
   copy: (code: string) => void; copyMsg: string;
+  /** Plays a sound effect (silent when sound is off, paused or hidden). */
+  play: (id: CueId) => void;
 }
 interface Replay { result: BattleResult; side: 'a' | 'b'; reply?: string }
 const label = (o: Owner) => `${o.collection === 'genesis' ? 'Genesis' : 'Friend'} #${o.tokenId}`;
@@ -26,13 +29,15 @@ export function BattleTab(p: BattleTabProps) {
   const chosen = deck.map(i => cards[i]).filter(Boolean);
   const full = album.challenges.length >= MAX_OPEN;
   const ready = chosen.length === DECK_SIZE && !p.paused && !p.busy && !full;
-  const toggle = (i: number) => setDeck(d => d.includes(i) ? d.filter(x => x !== i) : d.length < DECK_SIZE ? [...d, i] : d);
+  const toggle = (i: number) => { p.play('tap'); setDeck(d => d.includes(i) ? d.filter(x => x !== i) : d.length < DECK_SIZE ? [...d, i] : d); };
+  const fail = (text: string) => { setMsg(text); p.play('error'); };
   const outcome = (winner: BattleResult['winner'], side: 'a' | 'b') => winner === 'draw' ? 'draw' : winner === side ? 'win' : 'loss';
 
   async function challenge() {
     if (!ready) return;
     setMsg(''); setChallengeCode(null);
     if (!(await p.burnTicket())) return;
+    p.play('burn');
     const nonce = randomNonce();
     // Re-read the book after the wallet confirmations: other changes may have landed meanwhile.
     p.commit(addChallenge(recordBurn(p.current()), nonce, chosen));
@@ -44,23 +49,24 @@ export function BattleTab(p: BattleTabProps) {
     setMsg(''); setReplay(null);
     let parsed;
     try { parsed = decodeBattle(code); } catch (e) {
-      setMsg(/typo/.test((e as Error).message) ? t('コードに打ち間違いがあります。', 'This code has a typo.') : t('バトルコードではありません。', 'This is not a battle code.')); return;
+      fail(/typo/.test((e as Error).message) ? t('コードに打ち間違いがあります。', 'This code has a typo.') : t('バトルコードではありません。', 'This is not a battle code.')); return;
     }
     parsed.deck.forEach(p.loadArt);
     const mine = parsed.owner.collection === me.collection && parsed.owner.tokenId === me.tokenId;
     const [open, rest] = takeChallenge(album, parsed.nonce);
     if (open && !mine) {
       const key = `reply:${parsed.owner.collection}:${parsed.owner.tokenId}:${parsed.nonce}`;
-      if (hasFought(album, key)) { setMsg(t('この返信はもう結果に反映されています。', 'This reply has already been counted.')); return; }
+      if (hasFought(album, key)) { fail(t('この返信はもう結果に反映されています。', 'This reply has already been counted.')); return; }
       const result = battle(open.deck, parsed.deck, battleSeed(open.deck, parsed.deck, parsed.nonce));
       p.commit(markFought(recordBattle(rest, outcome(result.winner, 'a')), key));
       setReplay({ result, side: 'a' }); setCode(''); return;
     }
-    if (mine) { setMsg(t('自分の挑戦には自分では答えられません。友だちに送ってね。', 'You cannot answer your own challenge. Send it to a friend.')); return; }
+    if (mine) { fail(t('自分の挑戦には自分では答えられません。友だちに送ってね。', 'You cannot answer your own challenge. Send it to a friend.')); return; }
     const key = `${parsed.owner.collection}:${parsed.owner.tokenId}:${parsed.nonce}`;
-    if (hasFought(album, key)) { setMsg(t('この挑戦にはもう答えています。', 'You have already answered this challenge.')); return; }
-    if (chosen.length !== DECK_SIZE) { setMsg(t(`先に下でデッキを${DECK_SIZE}枚えらんでね。`, `Pick a ${DECK_SIZE}-card deck below first.`)); return; }
+    if (hasFought(album, key)) { fail(t('この挑戦にはもう答えています。', 'You have already answered this challenge.')); return; }
+    if (chosen.length !== DECK_SIZE) { fail(t(`先に下でデッキを${DECK_SIZE}枚えらんでね。`, `Pick a ${DECK_SIZE}-card deck below first.`)); return; }
     if (!(await p.burnTicket())) return;
+    p.play('burn');
     const result = battle(parsed.deck, chosen, battleSeed(parsed.deck, chosen, parsed.nonce));
     p.commit(markFought(recordBattle(recordBurn(p.current()), outcome(result.winner, 'b')), key));
     setReplay({ result, side: 'b', reply: encodeBattle({ owner: me, nonce: parsed.nonce, deck: chosen }) }); setCode('');
@@ -74,7 +80,7 @@ export function BattleTab(p: BattleTabProps) {
       <div className="burn"><b data-testid="rf-burned">{p.burnedLabel}</b><small>{t('燃やしたRF', 'RF burned')}</small></div>
     </section>
 
-    {replay && <BattleReplay key={`${replay.side}-${replay.reply ?? ''}-${replay.result.rounds.map(r => r.hits.length).join('.')}`} replay={replay} lang={lang} reduced={p.reduced} rowsFor={p.rowsFor} copy={p.copy} copyMsg={p.copyMsg} onClose={() => setReplay(null)} />}
+    {replay && <BattleReplay key={`${replay.side}-${replay.reply ?? ''}-${replay.result.rounds.map(r => r.hits.length).join('.')}`} replay={replay} lang={lang} reduced={p.reduced} rowsFor={p.rowsFor} copy={p.copy} copyMsg={p.copyMsg} play={p.play} onClose={() => setReplay(null)} />}
 
     <section className="panel">
       <h2>{t('対戦する', 'Battle')}</h2>
@@ -110,8 +116,8 @@ export function BattleTab(p: BattleTabProps) {
   </div>;
 }
 
-function BattleReplay({ replay, lang, reduced, rowsFor, copy, copyMsg, onClose }: {
-  replay: Replay; lang: Lang; reduced: boolean; rowsFor: (s: Sticker) => Sprite | null; copy: (c: string) => void; copyMsg: string; onClose: () => void;
+function BattleReplay({ replay, lang, reduced, rowsFor, copy, copyMsg, play, onClose }: {
+  replay: Replay; lang: Lang; reduced: boolean; rowsFor: (s: Sticker) => Sprite | null; copy: (c: string) => void; copyMsg: string; play: (id: CueId) => void; onClose: () => void;
 }) {
   const t = (ja: string, en: string) => lang === 'ja' ? ja : en;
   const steps = useMemo(() => replay.result.rounds.flatMap((r, ri) => r.hits.map((h, hi) => ({ ri, hi }))), [replay]);
@@ -122,6 +128,14 @@ function BattleReplay({ replay, lang, reduced, rowsFor, copy, copyMsg, onClose }
     return () => clearTimeout(timer);
   }, [at, steps.length]);
   const done = at >= steps.length;
+  // Each shown hit sounds by the attacker's element (or critical); a finished round and the match get their own cues.
+  useEffect(() => {
+    const rounds = replay.result.rounds, prev = at > 0 ? steps[at - 1] : null;
+    if (at >= steps.length) { play(verdictCue(replay.result.winner, replay.side)); return; }
+    if (prev && steps[at].ri !== prev.ri) play(roundCue(rounds[prev.ri].winner, replay.side));
+    const { ri, hi } = steps[at], h = rounds[ri].hits[hi], r = rounds[ri];
+    play(hitCue(cardStats(h.by === 'a' ? r.a : r.b).element, h.crit));
+  }, [at]); // once per step; the replay is fixed for this component (keyed by battle)
   const cur = done ? { ri: replay.result.rounds.length - 1, hi: -1 } : steps[at];
   const round = replay.result.rounds[cur.ri], hit = cur.hi >= 0 ? round.hits[cur.hi] : null;
   const my = replay.side, their: 'a' | 'b' = my === 'a' ? 'b' : 'a';

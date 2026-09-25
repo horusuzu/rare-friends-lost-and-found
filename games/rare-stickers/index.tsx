@@ -3,8 +3,9 @@ import type { GameComponentProps } from '@rarefriends/friendsdk/runtime';
 import { createFriendReader, createGenesisReader } from '@rarefriends/friendsdk/sprites';
 import {
   STYLES, RARITY_LABEL, PAGE_CAP, openPack, stickerName, encodeCode, decodeCode, newAlbum, refillPacks, usePack, addSticker,
-  serializeAlbum, parseAlbum, premiumSticker, recordRfPack, RF_PACK_OUTCOMES, MAX_ITEMS, type Album, type Sticker, type Collection,
+  serializeAlbum, parseAlbum, premiumSticker, recordRfPack, RF_PACK_OUTCOMES, MAX_ITEMS, setSound, type Album, type Sticker, type Collection,
 } from './album.ts';
+import { CUES, createSound, revealCue, type CueId } from './sound.ts';
 import definition from './game.json' with { type: 'json' };
 import { type Sprite } from './art.ts';
 import { CardCanvas } from './card-canvas.tsx';
@@ -62,6 +63,8 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
   const { sprites, load } = useSprites();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null), [busy, setBusy] = useState(false), [rfMsg, setRfMsg] = useState('');
   const saving = useRef(false), dirty = useRef(false), latest = useRef<Album | null>(null), modalClose = useRef<HTMLButtonElement>(null), alive = useRef(true);
+  const [sfx] = useState(() => createSound(CUES)), toggleSoundRef = useRef<() => void>(() => undefined);
+  const play = (id: CueId) => { sfx.play(id); };
   const t = (ja: string, en: string) => lang === 'ja' ? ja : en;
   const owner = collection as Collection, me = labelOf(owner, friendId);
   const reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -95,6 +98,26 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [selected]);
+  // Sound: the AudioContext is created on the first gesture; silent while muted, paused or hidden.
+  useEffect(() => { sfx.setEnabled(album?.sound ?? true); }, [sfx, album?.sound]);
+  useEffect(() => {
+    const sync = () => sfx.setSuspended(paused || document.hidden);
+    sync(); document.addEventListener('visibilitychange', sync);
+    return () => document.removeEventListener('visibilitychange', sync);
+  }, [sfx, paused]);
+  useEffect(() => {
+    const unlock = () => { sfx.unlock(); };
+    const gestures = ['pointerdown', 'pointerup', 'touchend', 'keydown', 'click'] as const;
+    gestures.forEach(g => window.addEventListener(g, unlock, true));
+    // M toggles sound, except while typing a code.
+    const onKey = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLElement && (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName));
+      if (e.key.toLowerCase() === 'm' && !typing && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) toggleSoundRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => { gestures.forEach(g => window.removeEventListener(g, unlock, true)); window.removeEventListener('keydown', onKey); };
+  }, [sfx]);
+  useEffect(() => () => sfx.close(), [sfx]);
   // Load art for every Friend that appears in the book.
   useEffect(() => { album?.items.forEach(it => load(it.sticker.collection, it.sticker.tokenId)); }, [album, load]);
 
@@ -111,6 +134,14 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
     void client.saveLocal(serializeAlbum(next)).then(() => done(true), () => { dirty.current = true; done(false); });
   }
   const commit = (next: Album) => { setAlbum(next); persist(next); };
+  toggleSoundRef.current = () => {
+    const current = latest.current ?? album;
+    // The host refuses saves while paused or during an RF action, so the switch waits for those to finish.
+    if (!current || paused || busy) return;
+    const next = setSound(current, !current.sound);
+    commit(next); sfx.setEnabled(next.sound);
+    if (next.sound && sfx.unlock()) sfx.play('tap');
+  };
   const pages = album ? Math.max(1, Math.ceil(album.items.length / POCKETS)) : 1;
 
   function openOne() {
@@ -119,14 +150,16 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
       const sticker = openPack({ collection: owner, tokenId: friendId }, newSeed());
       const next = addSticker(usePack(album), sticker, 'pack', newSeed());
       commit(next); reveal(sticker, next);
-    } catch (e) { setTradeMsg((e as Error).message); }
+    } catch (e) { setTradeMsg((e as Error).message); play('error'); }
   }
 
   const refresh = () => client.read().then(s => { if (alive.current) setSnapshot(s); }, () => undefined);
   const reveal = (sticker: Sticker, next: Album) => {
     setOpening(sticker); setPage(Math.floor((next.items.length - 1) / POCKETS));
-    if (reduced) { setPhase('reveal'); return; }
-    setPhase('tear'); setTimeout(() => { if (alive.current) setPhase('reveal'); }, 900);
+    const shine = revealCue(STYLES[sticker.style].rarity);
+    if (reduced) { setPhase('reveal'); play(shine); return; }
+    setPhase('tear'); play('tear');
+    setTimeout(() => { if (alive.current) { setPhase('reveal'); play(shine); } }, 900);
   };
 
   /**
@@ -179,10 +212,10 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
     try {
       const s = decodeCode(codeInput);
       if (s.collection === owner && s.tokenId === friendId) { setTradeMsg(t('自分のFriendのシールはパックから出ます。友だちのFriendのコードを貼ってね。', 'Stickers of your own Friend come from packs. Paste a code for someone else\'s Friend.')); return; }
-      load(s.collection, s.tokenId); setIncoming(s);
+      load(s.collection, s.tokenId); setIncoming(s); play('flip');
     }
     catch (e) {
-      const m = (e as Error).message;
+      const m = (e as Error).message; play('error');
       setTradeMsg(lang === 'ja' ? (/typo/.test(m) ? 'コードに打ち間違いがあります。もう一度確かめてください。' : /newer/.test(m) ? '新しい版のコードです。' : 'シールのコードではありません。') : m);
     }
   }
@@ -190,18 +223,19 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
     if (!album || !incoming || paused || busy) return;
     try {
       const next = addSticker(album, incoming, 'trade', newSeed());
-      commit(next); setIncoming(null); setCodeInput(''); setTab('book'); setPage(Math.floor((next.items.length - 1) / POCKETS));
+      commit(next); setIncoming(null); setCodeInput(''); setTab('book'); setPage(Math.floor((next.items.length - 1) / POCKETS)); play('accept');
     } catch (e) {
-      const m = (e as Error).message;
+      const m = (e as Error).message; play('error');
       setTradeMsg(lang === 'ja' ? (/already/.test(m) ? 'このシールはもうシール帳にあります。' : /full/.test(m) ? 'シール帳がいっぱいです。' : m) : m);
     }
   }
   async function copyCode(code: string) {
-    try { await navigator.clipboard.writeText(code); setCopyMsg(t('コピーしました', 'Copied')); }
-    catch { setCopyMsg(t('自動コピーできませんでした。コードを長押し/選択してコピーしてください。', 'Automatic copy is blocked here. Select the code and copy it.')); }
+    try { await navigator.clipboard.writeText(code); setCopyMsg(t('コピーしました', 'Copied')); play('copy'); }
+    catch { play('error'); setCopyMsg(t('自動コピーできませんでした。コードを長押し/選択してコピーしてください。', 'Automatic copy is blocked here. Select the code and copy it.')); }
   }
 
-  const openDetail = (index: number) => { setSelected(index); setShownCode(null); setCopyMsg(''); };
+  const openDetail = (index: number) => { setSelected(index); setShownCode(null); setCopyMsg(''); play('flip'); };
+  const turnPage = (delta: number) => { setPage(p => p + delta); play('page'); };
 
   if (error) return <section className="stickers"><div className="center"><h2>OOPS</h2><p>{error === 'save'
     ? t('保存したシール帳を読み込めませんでした。元のデータは上書きせずにそのまま残しています。', 'Could not read your saved sticker book. Your saved data has been left untouched.')
@@ -216,11 +250,15 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
   return <section className="stickers" lang={lang} aria-label="Rare Stickers">
     <header>
       <div className="brand"><small>RARE FRIENDS / TRADING CARDS</small><h1>{t('レアトレカ', 'RARE CARDS')}</h1></div>
-      <button className="lang" onClick={() => setLang(lang === 'ja' ? 'en' : 'ja')}>{lang === 'ja' ? 'English' : '日本語'}</button>
+      <div className="header-tools">
+        <button className={`sound-toggle${album.sound ? '' : ' off'}`} onClick={() => toggleSoundRef.current()} aria-pressed={album.sound} disabled={paused || busy}
+          aria-label={t('効果音', 'Sound effects')} title={t('効果音 オン/オフ（M）', 'Sound effects on/off (M)')} aria-keyshortcuts="M" data-testid="sound"><span aria-hidden="true">♪</span></button>
+        <button className="lang" onClick={() => setLang(lang === 'ja' ? 'en' : 'ja')}>{lang === 'ja' ? 'English' : '日本語'}</button>
+      </div>
     </header>
     <nav className="tabs" aria-label={t('メニュー', 'Menu')}>
       {([['book', t('カード帳', 'Binder')], ['pack', t('パック', 'Packs')], ['battle', t('バトル', 'Battle')], ['trade', t('交換', 'Trade')]] as [Tab, string][]).map(([id, text]) =>
-        <button key={id} className={tab === id ? 'on' : ''} aria-pressed={tab === id} disabled={busy} onClick={() => { setTab(id); setSelected(null); setTradeMsg(''); }}>{text}{id === 'pack' ? ` ${album.packs}` : ''}</button>)}
+        <button key={id} className={tab === id ? 'on' : ''} aria-pressed={tab === id} disabled={busy} onClick={() => { setTab(id); setSelected(null); setTradeMsg(''); play('tap'); }}>{text}{id === 'pack' ? ` ${album.packs}` : ''}</button>)}
     </nav>
 
     {tab === 'book' && <div className="book">
@@ -237,9 +275,9 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
         {album.items.length === 0 && <p className="empty">{t('パックを開けて、カードを集めよう！', 'Open a pack to collect your first card!')}</p>}
       </div>
       <div className="pager">
-        <button disabled={page === 0} onClick={() => setPage(p => p - 1)} aria-label={t('前のページ', 'Previous page')}>◀</button>
+        <button disabled={page === 0} onClick={() => turnPage(-1)} aria-label={t('前のページ', 'Previous page')}>◀</button>
         <span>{page + 1} / {pages}</span>
-        <button disabled={page >= pages - 1} onClick={() => setPage(p => p + 1)} aria-label={t('次のページ', 'Next page')}>▶</button>
+        <button disabled={page >= pages - 1} onClick={() => turnPage(1)} aria-label={t('次のページ', 'Next page')}>▶</button>
       </div>
       <p className="stats">{t(`${album.items.length}枚 · ${friendsCollected}体のFriend · ${album.record.wins}勝${album.record.losses}敗 · 使ったRF ${rf(BigInt(album.rfPacks + album.rfBurned) * PACK_PRICE)}（うち燃やした ${rf(BigInt(album.rfBurned) * PACK_PRICE)}）`,
         `${album.items.length} cards · ${friendsCollected} Friends · ${album.record.wins}W ${album.record.losses}L · ${rf(BigInt(album.rfPacks + album.rfBurned) * PACK_PRICE)} spent (${rf(BigInt(album.rfBurned) * PACK_PRICE)} burned)`)}</p>
@@ -248,12 +286,12 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
 
     {tab === 'battle' && <BattleTab album={album} commit={commit} current={() => latest.current ?? album} me={{ collection: owner, tokenId: friendId }} lang={lang} paused={paused} busy={busy} reduced={reduced}
       rowsFor={rowsFor} loadArt={s => load(s.collection, s.tokenId)} burnTicket={async () => { if (busy || paused) return false; return (await spendTicket(true)) !== null; }}
-      ticketLabel={rf(PACK_PRICE)} burnedLabel={rf(BigInt(album.rfBurned) * PACK_PRICE)} copy={code => void copyCode(code)} copyMsg={copyMsg} />}
+      ticketLabel={rf(PACK_PRICE)} burnedLabel={rf(BigInt(album.rfBurned) * PACK_PRICE)} copy={code => void copyCode(code)} copyMsg={copyMsg} play={play} />}
     {tab === 'battle' && rfMsg && <p className="rf-msg" role="status">{rfMsg}</p>}
 
     {tab === 'pack' && <div className="packs">
       <p className="lead">{t(`あなたの ${me} のシールパック。1日${3}パック（最大9）もらえます。`, `Sticker packs of your ${me}. Three new packs a day (up to nine).`)}</p>
-      <button className={`pack ${phase}`} disabled={paused || busy || phase === 'tear' || (phase === 'idle' && album.packs === 0)} onClick={phase === 'reveal' ? () => { setPhase('idle'); setOpening(null); } : openOne}
+      <button className={`pack ${phase}`} disabled={paused || busy || phase === 'tear' || (phase === 'idle' && album.packs === 0)} onClick={phase === 'reveal' ? () => { setPhase('idle'); setOpening(null); play('pocket'); } : openOne}
         aria-label={phase === 'reveal' ? t('次へ', 'Next') : t(`パックを開ける（のこり${album.packs}）`, `Open a pack (${album.packs} left)`)}>
         {phase === 'reveal' && opening
           ? <span className="reveal"><CardCanvas sticker={opening} rows={rowsFor(opening)} width={190} lang={lang} live reduced={reduced} />
@@ -324,7 +362,7 @@ function Book({ friendId, collection = 'generations', client, paused }: GameComp
           <input readOnly value={shownCode} aria-label={t('交換コード', 'Trade code')} onFocus={e => e.currentTarget.select()} data-testid="trade-code" />
           <button onClick={() => void copyCode(shownCode)}>{t('コピー', 'Copy')}</button>
           {copyMsg && <small role="status">{copyMsg}</small>}
-        </div> : <button className="primary" onClick={() => setShownCode(encodeCode(sel.sticker))} disabled={paused}>{t('交換コードを出す', 'Show trade code')}</button>}
+        </div> : <button className="primary" onClick={() => { setShownCode(encodeCode(sel.sticker)); play('tap'); }} disabled={paused}>{t('交換コードを出す', 'Show trade code')}</button>}
         <button ref={modalClose} onClick={() => setSelected(null)}>{t('とじる', 'Close')}</button>
       </div>
     </div>}

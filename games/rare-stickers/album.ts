@@ -15,10 +15,11 @@ export interface Challenge { nonce: number; deck: Sticker[] }
  * rfPacks / rfBurned: RF tickets spent on packs / burned as battle entry fees.
  * challenges: my open challenges (their decks are needed to replay the reply).
  * fought: challenge keys already answered or settled, so a challenge counts only once.
+ * sound: sound effects on/off (books saved before the setting existed load with sound on).
  */
 export interface Album {
   version: 1; packs: number; day: string; rfPacks: number; rfBurned: number;
-  record: BattleRecord; challenges: Challenge[]; fought: string[]; items: Placed[];
+  record: BattleRecord; challenges: Challenge[]; fought: string[]; items: Placed[]; sound: boolean;
 }
 const MAX_CHALLENGES = 10, MAX_FOUGHT = 60;
 
@@ -167,8 +168,9 @@ export function decodeCode(input: string): Sticker {
 
 // ---- Album ----
 export function newAlbum(day: string): Album {
-  return { version: 1, packs: PACKS_PER_DAY, day, rfPacks: 0, rfBurned: 0, record: { wins: 0, losses: 0, draws: 0 }, challenges: [], fought: [], items: [] };
+  return { version: 1, packs: PACKS_PER_DAY, day, rfPacks: 0, rfBurned: 0, record: { wins: 0, losses: 0, draws: 0 }, challenges: [], fought: [], items: [], sound: true };
 }
+export function setSound(album: Album, sound: boolean): Album { return album.sound === sound ? album : { ...album, sound }; }
 export function recordBattle(album: Album, result: 'win' | 'loss' | 'draw'): Album {
   const key = result === 'win' ? 'wins' : result === 'loss' ? 'losses' : 'draws';
   return { ...album, record: { ...album.record, [key]: album.record[key] + 1 } };
@@ -223,15 +225,16 @@ export function serializeAlbum(album: Album): string {
   const items: StoredItem[] = album.items.map(it => [encodeCode(it.sticker), it.source === 'pack' ? 'p' : 't', it.page, Math.round(it.x * 1000), Math.round(it.y * 1000), Math.round(it.rot * 1000)]);
   const challenges = album.challenges.map(c => [c.nonce, c.deck.map(encodeCode)]);
   return JSON.stringify({ version: 1, packs: album.packs, day: album.day, rfPacks: album.rfPacks, rfBurned: album.rfBurned,
-    record: [album.record.wins, album.record.losses, album.record.draws], challenges, fought: album.fought, items });
+    record: [album.record.wins, album.record.losses, album.record.draws], challenges, fought: album.fought, items, sound: album.sound });
 }
 
 export function parseAlbum(raw: string | null): Album | null {
   if (raw === null) return null;
-  const v = JSON.parse(raw) as { version?: unknown; packs?: unknown; day?: unknown; rfPacks?: unknown; rfBurned?: unknown; record?: unknown; challenges?: unknown; fought?: unknown; items?: unknown };
+  const v = JSON.parse(raw) as { version?: unknown; packs?: unknown; day?: unknown; rfPacks?: unknown; rfBurned?: unknown; record?: unknown; challenges?: unknown; fought?: unknown; items?: unknown; sound?: unknown };
   const int = (n: unknown, min: number, max: number) => Number.isInteger(n) && (n as number) >= min && (n as number) <= max;
   if (v.version !== 1 || !int(v.packs, 0, MAX_PACKS) || typeof v.day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v.day) ||
-      !Array.isArray(v.items) || v.items.length > MAX_ITEMS || (v.rfPacks !== undefined && !int(v.rfPacks, 0, 1_000_000))) throw new Error('Invalid sticker book.');
+      !Array.isArray(v.items) || v.items.length > MAX_ITEMS || (v.rfPacks !== undefined && !int(v.rfPacks, 0, 1_000_000)) ||
+      (v.sound !== undefined && typeof v.sound !== 'boolean')) throw new Error('Invalid sticker book.');
   const items = v.items.map((raw: unknown): Placed => {
     if (!Array.isArray(raw) || raw.length !== 6) throw new Error('Invalid sticker book.');
     const [code, source, page, x, y, rot] = raw as StoredItem;
@@ -251,5 +254,6 @@ export function parseAlbum(raw: string | null): Album | null {
   return {
     version: 1, packs: v.packs as number, day: v.day, rfPacks: v.rfPacks === undefined ? 0 : count(v.rfPacks), rfBurned: v.rfBurned === undefined ? 0 : count(v.rfBurned),
     record: { wins: count(rec[0]), losses: count(rec[1]), draws: count(rec[2]) }, challenges, fought: rawFought as string[], items,
+    sound: v.sound === undefined ? true : v.sound as boolean,
   };
 }
