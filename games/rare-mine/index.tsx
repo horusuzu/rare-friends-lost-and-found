@@ -117,9 +117,6 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
         case 'vein': a.vein(); break;
         case 'gem': a.gem(); break;
         case 'chaching': a.chaChing(); break;
-        case 'roll': stopRoll.current = a.drumRoll(q.n); break;
-        case 'win': a.fanfare(); break;
-        case 'burn': a.burn(); break;
       }
     }
   }

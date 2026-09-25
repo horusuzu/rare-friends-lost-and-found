@@ -1,8 +1,12 @@
 /**
  * Rare Mine's ASMR sound, synthesised with WebAudio (no audio files). Coins are short inharmonic metal partials
  * with soft attacks and random pitch; they grow richer and settle in pairs ("clink-clink") as the pile grows.
- * Voices are capped and everything runs through a gentle compressor so a long session never gets harsh.
+ * The bet's reach, win and burn cues live in sound-fx.ts. Voices are capped and everything runs through a gentle
+ * compressor so a long session never gets harsh; hush() cuts every tail at once (pause, mute, a new bet).
  */
+import type { FxCue } from './reach.ts';
+import { createFxVoices, playCue } from './sound-fx.ts';
+
 export interface MineAudio {
   /** Coins landing in the cart; `richness` 0–1 follows the pile size. */
   clink(count: number, richness: number): void;
@@ -13,40 +17,56 @@ export interface MineAudio {
   vein(): void;
   gem(): void;
   chaChing(): void;
-  /** A rising drum roll for the bet suspense; the returned function stops it early. */
-  drumRoll(seconds: number): () => void;
-  fanfare(): void;
-  burn(): void;
+  /** One reach / win / burn cue from a reach.ts timeline. */
+  cue(q: FxCue): void;
+  /** Fade out everything that is playing or scheduled (fever loops included). */
+  hush(): void;
   close(): void;
 }
 
-/** Hard ceiling on scheduled nodes; coins beyond it are skipped rather than stacking into noise. */
-const MAX_VOICES = 64;
+/** The primitives the effect voices are built from (all scheduled on the shared, capped voice pool). */
+export interface Synth {
+  readonly ctx: BaseAudioContext;
+  now(): number;
+  /** The current master input; it is replaced by hush(), so read it at scheduling time. */
+  out(): AudioNode;
+  voice(node: AudioScheduledSourceNode, at: number, end: number, start?: () => void): boolean;
+  env(at: number, peak: number, attack: number, decay: number, out?: AudioNode): GainNode;
+  tone(type: OscillatorType, freq: number, at: number, peak: number, attack: number, decay: number, out?: AudioNode, pan?: number): OscillatorNode | null;
+  hiss(at: number, len: number, peak: number, type: BiquadFilterType, freq: number, q?: number, out?: AudioNode, attack?: number): BiquadFilterNode | null;
+  coin(at: number, pitch: number, richness: number, level: number, pan: number): void;
+}
+
+/** Hard ceiling on scheduled nodes; sounds beyond it are skipped rather than stacking into noise. */
+export const MAX_VOICES = 80;
 const CLINK_GAP = 0.022;
 const METAL = [1, 2.76, 5.4, 8.93] as const;
+const LEVEL = 0.32;
 
 export function createMineAudio(): MineAudio | null {
   const Context = globalThis.AudioContext;
   if (!Context) return null;
   try {
-    return build(new Context());
+    return buildAudio(new Context());
   } catch {
     return null;
   }
 }
 
-function build(ctx: AudioContext): MineAudio {
+/** Build the audio graph on any context (exported for tests with a stub context). */
+export function buildAudio(ctx: BaseAudioContext & { close?: () => Promise<void>; resume?: () => Promise<void> }): MineAudio {
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -20; comp.ratio.value = 4; comp.attack.value = 0.004; comp.release.value = 0.2;
-  const master = ctx.createGain(); master.gain.value = 0.32;
   const soften = ctx.createBiquadFilter(); soften.type = 'lowpass'; soften.frequency.value = 9000;
-  master.connect(soften).connect(comp).connect(ctx.destination);
+  soften.connect(comp).connect(ctx.destination);
+  const makeMaster = () => { const g = ctx.createGain(); g.gain.value = LEVEL; g.connect(soften); return g; };
+  let master = makeMaster();
   const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const data = noise.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
   let voices = 0, nextClink = 0;
 
-  const wake = () => { if (ctx.state === 'suspended') void ctx.resume().catch(() => undefined); };
+  const wake = () => { if (ctx.state === 'suspended') void ctx.resume?.().catch(() => undefined); };
   const now = () => ctx.currentTime + 0.01;
   /** Reserve a voice; false when the cap is reached (the sound is simply skipped). */
   function voice(node: AudioScheduledSourceNode, at: number, end: number, start: () => void = () => node.start(at)): boolean {
@@ -71,14 +91,12 @@ function build(ctx: AudioContext): MineAudio {
     if (!voice(osc, at, end)) { osc.disconnect(); return null; }
     return osc;
   }
-  function hiss(at: number, len: number, peak: number, type: BiquadFilterType, freq: number, q = 1, out: AudioNode = master, attack = 0.003, force = false) {
-    if (voices >= MAX_VOICES && !force) return null;
+  function hiss(at: number, len: number, peak: number, type: BiquadFilterType, freq: number, q = 1, out: AudioNode = master, attack = 0.003) {
+    if (voices >= MAX_VOICES) return null;
     const src = ctx.createBufferSource(); src.buffer = noise; src.loop = true;
     const f = ctx.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
     src.connect(f).connect(env(at, peak, attack, len, out));
-    const begin = () => src.start(at, Math.random() * 0.5);
-    if (force) { begin(); src.stop(at + attack + len + 0.02); return f; }
-    if (!voice(src, at, at + attack + len + 0.02, begin)) { src.disconnect(); return null; }
+    if (!voice(src, at, at + attack + len + 0.02, () => src.start(at, Math.random() * 0.5))) { src.disconnect(); return null; }
     return f;
   }
   /** One coin: a soft contact tick plus 2–4 inharmonic partials. */
@@ -92,6 +110,8 @@ function build(ctx: AudioContext): MineAudio {
     coin(at, pitch, richness, level, pan);
     if (Math.random() < 0.3 + richness * 0.45) coin(at + 0.035 + Math.random() * 0.06, pitch * 2 ** ((Math.random() - 0.5) * 0.2), richness, level * 0.55, pan);
   }
+  const synth: Synth = { ctx, now, out: () => master, voice, env, tone, hiss, coin };
+  const fx = createFxVoices(synth);
 
   return {
     clink(count, richness) {
@@ -141,36 +161,13 @@ function build(ctx: AudioContext): MineAudio {
       for (const [f, p] of [[1568, 0.14], [2093, 0.1], [1568 * 2.76, 0.03]] as const) tone('sine', f, at + 0.1, p, 0.004, 0.9);
       for (let i = 0; i < 6; i++) clinkAt(at + 0.18 + i * 0.05 + Math.random() * 0.02, 0.9, 0.6);
     },
-    drumRoll(seconds) {
-      wake();
-      const bus = ctx.createGain(); bus.gain.value = 1; bus.connect(master);
-      const start = now(), len = Math.max(0.2, seconds);
-      for (let t = 0; t < len;) {
-        const k = t / len, at = start + t;
-        hiss(at, 0.05, 0.05 + 0.12 * k, 'bandpass', 210 + 60 * k, 1.5, bus, 0.003, true);
-        t += 1 / (8 + 16 * k);
-      }
-      const release = setTimeout(() => bus.disconnect(), (len + 0.5) * 1000);
-      return () => {
-        clearTimeout(release);
-        bus.gain.cancelScheduledValues(ctx.currentTime); bus.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
-        setTimeout(() => bus.disconnect(), 200);
-      };
+    cue(q) { wake(); playCue(fx, q); },
+    hush() {
+      const old = master, t = ctx.currentTime;
+      old.gain.cancelScheduledValues(t); old.gain.setValueAtTime(LEVEL, t); old.gain.linearRampToValueAtTime(0, t + 0.04);
+      setTimeout(() => old.disconnect(), 150);
+      master = makeMaster(); nextClink = 0;
     },
-    fanfare() {
-      wake();
-      const at = now();
-      [523, 659, 784, 1047].forEach((f, i) => { tone('triangle', f, at + i * 0.09, 0.14, 0.006, 0.18); tone('square', f, at + i * 0.09, 0.025, 0.006, 0.12); });
-      for (const f of [784, 1047, 1319]) tone('triangle', f, at + 0.36, 0.08, 0.02, 0.6);
-    },
-    burn() {
-      wake();
-      const at = now();
-      const sweep = hiss(at, 0.7, 0.28, 'bandpass', 300, 0.9, master, 0.12);
-      sweep?.frequency.exponentialRampToValueAtTime(2400, at + 0.6);
-      tone('sine', 70, at, 0.3, 0.01, 0.4);
-      for (let i = 0; i < 22; i++) hiss(at + 0.15 + Math.random() * 1.0, 0.006, 0.12 + Math.random() * 0.1, 'highpass', 2500);
-    },
-    close() { void ctx.close().catch(() => undefined); },
+    close() { void ctx.close?.().catch(() => undefined); },
   };
 }
