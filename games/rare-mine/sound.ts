@@ -150,7 +150,12 @@ function build(ctx: AudioContext): MineAudio {
         hiss(at, 0.05, 0.05 + 0.12 * k, 'bandpass', 210 + 60 * k, 1.5, bus, 0.003, true);
         t += 1 / (8 + 16 * k);
       }
-      return () => { bus.gain.cancelScheduledValues(ctx.currentTime); bus.gain.setTargetAtTime(0, ctx.currentTime, 0.02); };
+      const release = setTimeout(() => bus.disconnect(), (len + 0.5) * 1000);
+      return () => {
+        clearTimeout(release);
+        bus.gain.cancelScheduledValues(ctx.currentTime); bus.gain.setTargetAtTime(0, ctx.currentTime, 0.02);
+        setTimeout(() => bus.disconnect(), 200);
+      };
     },
     fanfare() {
       wake();

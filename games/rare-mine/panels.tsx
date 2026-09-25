@@ -1,4 +1,5 @@
 /** DOM overlays and panels: odometer, combo meter, Withdraw / Bet bar, odds dialog, suspense, result banner and stats. */
+import { useEffect, useRef } from 'react';
 import { MAX_STREAK, PAYOUT, WIN_CHANCE } from './economy.ts';
 import { canBet, multiplier, type MineState, type Outcome } from './game.ts';
 
@@ -54,9 +55,12 @@ export function ActionBar({ s, lang, active, hint, onWithdraw, onBet }: ActionPr
 }
 
 export function ConfirmPanel({ s, lang, onConfirm, onCancel }: { s: MineState; lang: Lang; onConfirm: () => void; onCancel: () => void }) {
-  return <div className="dialog confirm" role="dialog" aria-modal="false" aria-labelledby="confirm-title" data-testid="confirm">
-    <h2 id="confirm-title">{pick(lang, ['倍かけ？', 'Double or burn?'])}</h2>
-    <p className="odds" data-testid="odds">{pick(lang, ODDS)}</p>
+  // Focus the heading, not a button: a player still mashing Space or Enter to mine must never confirm a bet by accident.
+  const title = useRef<HTMLHeadingElement>(null);
+  useEffect(() => { title.current?.focus({ preventScroll: true }); }, []);
+  return <div className="dialog confirm" role="dialog" aria-modal="false" aria-labelledby="confirm-title" aria-describedby="confirm-odds" data-testid="confirm">
+    <h2 id="confirm-title" ref={title} tabIndex={-1}>{pick(lang, ['倍かけ？', 'Double or burn?'])}</h2>
+    <p className="odds" id="confirm-odds" data-testid="odds">{pick(lang, ODDS)}</p>
     <dl>
       <div><dt>{pick(lang, ['賭け金', 'Stake'])}</dt><dd>{fmt(s.pot)}</dd></div>
       <div className="good"><dt>{pick(lang, ['勝ち', 'Win'])}</dt><dd>{fmt(s.pot * PAYOUT)}</dd></div>
@@ -79,7 +83,7 @@ export function RollPanel({ s, lang, reduced, onSkip }: { s: MineState; lang: La
 }
 
 export function ResultBanner({ last, lang }: { last: Outcome; lang: Lang }) {
-  return <div className={`banner ${last.win ? 'win' : 'lose'}`} role="status" data-testid="result">
+  return <div className={`banner ${last.win ? 'win' : 'lose'}`} aria-hidden="true" data-testid="result">
     {last.win
       ? <><b>{pick(lang, [`×${PAYOUT} 勝ち！`, `×${PAYOUT} WIN!`])}</b><small>{pick(lang, [`ポット ${fmt(last.pot)} · ${last.streak}連勝（×${multiplier(last.streak)}）`, `Pot ${fmt(last.pot)} · ${last.streak} in a row (×${multiplier(last.streak)})`])}</small></>
       : <><b>🔥 {fmt(last.stake)} burned</b><small>{pick(lang, ['ポットは全額バーンされました', 'The whole pot burned'])}</small></>}

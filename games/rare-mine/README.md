@@ -145,6 +145,18 @@ game saves every 20 strikes, on every withdraw, bet confirmation and sound toggl
 Every field is validated on load, including the ledger identities and the rock/strike counts; a
 malformed or foreign save is ignored with a notice.
 
+## Known limits
+
+- The bet stream is seeded and deterministic, as the preview requires (the browser test predicts each
+  result from the exposed `data-betseed`). Someone reading the page with developer tools can
+  therefore foresee the next bet. That only matters because it is a simulation; a live version must
+  take its randomness from the on-chain oracle, never from client state.
+- Saves live in the browser. Validation rejects malformed and inconsistent saves, but a hand-made
+  save that keeps every ledger identity is accepted. Nothing in the save has value.
+- If reading the save fails (not a malformed save), the title shows **Try again** (もう一度よむ);
+  starting a new mine instead replaces the unread save at the next autosave.
+- Coin particles, flames and sounds use browser randomness for presentation only.
+
 ## Development and verification
 
 ```sh

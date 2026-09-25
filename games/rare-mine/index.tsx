@@ -50,6 +50,7 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
   const started = view !== null;
   const active = started && ready && !paused && !manualPause;
   const activeRef = useRef(active); activeRef.current = active;
+  const pausedNow = useRef(manualPause); pausedNow.current = manualPause;
 
   useEffect(() => {
     let current = true;
@@ -161,7 +162,14 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
       const key = e.key.toLowerCase(), s = game.current;
       const onButton = (e.target as HTMLElement)?.closest?.('button');
       if (key === 'm') { e.preventDefault(); toggleSound(); return; }
-      if (key === 'p' || (key === 'escape' && s?.phase !== 'confirm')) { e.preventDefault(); if (s) setManualPause(v => { if (!v) void persist(s); return !v; }); return; }
+      if (key === 'p' || (key === 'escape' && s?.phase !== 'confirm')) {
+        e.preventDefault();
+        if (!s) return;
+        const next = !pausedNow.current;
+        setManualPause(next);
+        if (next) void persist(s);
+        return;
+      }
       if (!s) return;
       if (s.phase === 'confirm' && (key === 'y')) { e.preventDefault(); doConfirm(); return; }
       if (s.phase === 'confirm' && (key === 'n' || key === 'escape')) { e.preventDefault(); doCancel(); return; }
@@ -231,7 +239,7 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
       </div>}
       {s && <p className="sim" data-testid="sim-note">{pick(lang, SIM_NOTE)}</p>}
       {hint && active && <p className="nudge">{tt('ポットがたまった！ 引き出す？ 倍かけ？', 'Nice pile! Bank it, or double it?')}</p>}
-      {toast && active && <p className="toast" role="status">{pick(lang, toast.text)}</p>}
+      {toast && active && <p className="toast" aria-hidden="true">{pick(lang, toast.text)}</p>}
       {banner && s?.phase === 'mine' && <ResultBanner last={banner} lang={lang} />}
       {s?.phase === 'confirm' && <ConfirmPanel s={s} lang={lang} onConfirm={doConfirm} onCancel={doCancel} />}
       {s?.phase === 'roll' && <RollPanel s={s} lang={lang} reduced={reduced} onSkip={() => act(skipRoll)} />}
@@ -239,6 +247,8 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
         <h2>RARE<span>MINE</span></h2>
         {friendRows && !error && <p className="starring"><Portrait rows={friendRows} label={label} />{tt(`採掘係: ${label}`, `Miner: ${label}`)}</p>}
         <p>{tt('ほって、ためて、引き出すか 倍かけるか。', 'Dig, stack, then bank it or double it.')}</p>
+        {loadError && ready && !error && <p role="alert" className="fine">{tt('セーブを よめませんでした。', 'Could not read your save.')}
+          <button className="retry" onClick={() => { setLoadError(false); setAttempt(v => v + 1); }}>{tt('もう一度よむ', 'Try again')}</button></p>}
         {error ? <><p role="alert">{tt('Friendを よみこめませんでした。', 'Could not load your Friend.')}</p><button onClick={() => setAttempt(v => v + 1)}>{tt('もう一度', 'Retry')}</button></>
           : !ready ? <p>{tt('Friendを よみこみ中…', 'Loading Friend…')}</p>
             : <div className="choices">
@@ -257,6 +267,7 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
     </div></div>
     {s && <ActionBar s={s} lang={lang} active={active} hint={hint} onWithdraw={doWithdraw} onBet={doBet} />}
     {s && <StatsPanel s={s} lang={lang} canShare={!!client.shareScore && s.stats.betsWon + s.stats.betsLost > 0} sharing={sharing || paused} onShare={share} />}
+    <p className="sr-only" role="status" aria-live="polite">{announcement(lang, banner, toast)}</p>
     <footer>
       <span>{tt('タップ/Space: ほる · W: 引き出す · B: 倍かけ · Y/N: 決定/やめる · M: 音 · P: 一時停止', 'Tap/Space: strike · W: withdraw · B: bet · Y/N: confirm/cancel · M: sound · P: pause')}</span>
       <span>{pick(lang, SIM_NOTE)}</span>
@@ -265,6 +276,14 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
       : loadError && !saveError ? tt('セーブデータを よめませんでした。はじめから あそべます。', 'Could not read your save. You can start fresh.')
         : tt('セーブできませんでした。このまま あそべます。', 'Could not save. You can keep playing.')}</p>}
   </section>;
+}
+
+/** Text for the persistent live region: the latest bet result, else the latest vein or gem. */
+function announcement(lang: Lang, banner: Outcome | null, toast: Toast | null): string {
+  if (banner) return banner.win
+    ? pick(lang, [`勝ち。ポット ${fmt(banner.pot)}、${banner.streak}連勝。`, `Win. Pot ${fmt(banner.pot)}, ${banner.streak} in a row.`])
+    : pick(lang, [`負け。${fmt(banner.stake)} がバーンされました。`, `Lost. ${fmt(banner.stake)} burned.`]);
+  return toast ? pick(lang, toast.text) : '';
 }
 
 /** The Friend facing the rock (right), cycling its idle frames slowly. */
