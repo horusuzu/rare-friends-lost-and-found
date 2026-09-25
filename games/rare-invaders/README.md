@@ -23,6 +23,17 @@ value. The required game.json chance-game schema is unused by this arcade mode;
 no purchase, play or settlement action is called. The SDK host uses local preview
 mode. Reduced-motion preference disables moving star effects.
 
+## Phones
+
+Checked with touch-phone emulation at 360×640, 375×667, 390×664, 430×740 and 664×390
+(`mobile.test.mjs`). In portrait the field fills the width above one row of 56 px thumb keys
+(◀ ▶, FIRE, shield); in landscape the field takes the full height in the middle, with ◀ ▶ under
+the left thumb and shield and FIRE under the right. Keys respond to press-and-hold with several
+fingers at once and let go on `pointercancel`/`touchcancel`. The canvas backing store follows the
+screen density (integer 1–3×, pixelated), so the pixel art stays sharp. Taps never select text,
+flash or open the long-press menu, and the page never scrolls or bounces. Hiding the page (app
+switch, lock) pauses the run; the host bar below is one compact 48 px row.
+
 ## Sound
 
 Short synthesised WebAudio cues (oscillators and filtered noise; no audio files): shot, enemy hit
@@ -48,6 +59,7 @@ node node_modules/typescript/bin/tsc -p games/rare-invaders/tsconfig.json
 node scripts/dev-game.mjs check games/rare-invaders
 node --test games/rare-invaders/engine.test.mjs games/rare-invaders/sound.test.mjs
 node games/rare-invaders/browser.test.mjs
+node games/rare-invaders/mobile.test.mjs   # phone sizes with touch emulation
 node scripts/dev-game.mjs build games/rare-invaders --outdir release-invaders
 ```
 

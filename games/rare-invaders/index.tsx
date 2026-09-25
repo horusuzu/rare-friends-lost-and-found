@@ -21,7 +21,7 @@ export default function Invaders(props:GameComponentProps){return <Arcade key={`
 function Arcade({friendId,collection='generations',client,paused}:GameComponentProps){
  const [lang,setLang]=useState<'ja'|'en'>('ja'),[art,setArt]=useState<GenerationSprites|null>(null),[error,setError]=useState(''),[attempt,setAttempt]=useState(0),[ready,setReady]=useState(false);
  const [started,setStarted]=useState(false),[manualPause,setManualPause]=useState(false),[view,setView]=useState(createGame),[best,setBest]=useState(0),[saveError,setSaveError]=useState(false),[shareError,setShareError]=useState(false);
- const canvas=useRef<HTMLCanvasElement>(null),world=useRef(createGame()),keys=useRef(new Set<string>()),touch=useRef(new Map<number,string>()),shieldTap=useRef(false),bestRef=useRef(0),alive=useRef(false);
+ const canvas=useRef<HTMLCanvasElement>(null),scale=useRef(1),world=useRef(createGame()),keys=useRef(new Set<string>()),touch=useRef(new Map<number,string>()),shieldTap=useRef(false),bestRef=useRef(0),alive=useRef(false);
  const [sound,setSound]=useState(true),[sfx]=useState(()=>createSound(CUES)),soundRef=useRef(true),toggleSoundRef=useRef(()=>{});
  const t=(ja:string,en:string)=>lang==='ja'?ja:en;
  const active=started&&!paused&&!manualPause&&ready;
@@ -33,8 +33,14 @@ function Arcade({friendId,collection='generations',client,paused}:GameComponentP
  })().catch(()=>{if(current)setError('Could not load your Friend. Please retry.');});return()=>{current=false;alive.current=false;};},[client,friendId,collection,attempt]);
  useEffect(()=>{const clear=()=>{keys.current.clear();touch.current.clear();shieldTap.current=false;};const blur=()=>{clear();setManualPause(true);};const visibility=()=>{if(document.hidden)blur();};
  const down=(e:KeyboardEvent)=>{if((e.target as HTMLElement)?.closest('button,input'))return;if(['ArrowLeft','ArrowRight',' ','a','d','A','D','Shift'].includes(e.key)){e.preventDefault();keys.current.add(e.key.toLowerCase());}if(e.key==='Escape'||e.key.toLowerCase()==='p'){e.preventDefault();clear();setManualPause(v=>!v);}};
- const up=(e:KeyboardEvent)=>keys.current.delete(e.key.toLowerCase());window.addEventListener('keydown',down);window.addEventListener('keyup',up);window.addEventListener('blur',blur);document.addEventListener('visibilitychange',visibility);
- return()=>{clear();window.removeEventListener('keydown',down);window.removeEventListener('keyup',up);window.removeEventListener('blur',blur);document.removeEventListener('visibilitychange',visibility);};},[]);
+ const up=(e:KeyboardEvent)=>keys.current.delete(e.key.toLowerCase());const release=()=>touch.current.clear();
+ // pagehide covers iOS app switches and the back-forward cache; touchcancel (a call, a system gesture) lets go of every held control.
+ window.addEventListener('keydown',down);window.addEventListener('keyup',up);window.addEventListener('blur',blur);window.addEventListener('pagehide',blur);window.addEventListener('touchcancel',release);document.addEventListener('visibilitychange',visibility);
+ return()=>{clear();window.removeEventListener('keydown',down);window.removeEventListener('keyup',up);window.removeEventListener('blur',blur);window.removeEventListener('pagehide',blur);window.removeEventListener('touchcancel',release);document.removeEventListener('visibilitychange',visibility);};},[]);
+ // Crisp pixels on high-DPR screens: an integer backing scale (1–3) for the size the field is shown at.
+ useEffect(()=>{const el=canvas.current;if(!el)return;const fit=()=>{const shown=Math.min(el.clientWidth/WIDTH,el.clientHeight/HEIGHT);if(!shown)return;const k=Math.max(1,Math.min(3,Math.round((globalThis.devicePixelRatio||1)*shown)));
+  if(el.width!==WIDTH*k){scale.current=k;el.width=WIDTH*k;el.height=HEIGHT*k;}};fit();const observer=typeof ResizeObserver==='function'?new ResizeObserver(fit):null;observer?.observe(el);window.addEventListener('resize',fit);
+  return()=>{observer?.disconnect();window.removeEventListener('resize',fit);};},[]);
  // Sound: context on the first gesture, M toggles (unused by play), silent while paused or hidden.
  useEffect(()=>{const sync=()=>sfx.setSuspended(paused||manualPause||document.hidden);sync();document.addEventListener('visibilitychange',sync);return()=>document.removeEventListener('visibilitychange',sync);},[sfx,paused,manualPause]);
  useEffect(()=>{const unlock=()=>{sfx.unlock();};const gestures=['pointerdown','pointerup','touchend','keydown','click'] as const;gestures.forEach(g=>window.addEventListener(g,unlock,true));
@@ -49,7 +55,7 @@ function Arcade({friendId,collection='generations',client,paused}:GameComponentP
     const next=step(world.current,{move:Number(held('arrowright')||held('d'))-Number(held('arrowleft')||held('a')),fire:held(' ')||held('fire'),shield:shieldTap.current||held('shift')},dt);shieldTap.current=false;for(const id of soundsFor(world.current,next))sfx.play(id);world.current=next;
     if(next.status!=='playing'&&next.score>bestRef.current){bestRef.current=next.score;setBest(next.score);sfx.play('best');persist();}
    }
-   const c=canvas.current?.getContext('2d');if(c)draw(c,world.current,art,reduced);
+   const c=canvas.current?.getContext('2d');if(c){c.setTransform(scale.current,0,0,scale.current,0,0);draw(c,world.current,art,reduced);}
    if(now-published>70||world.current.status!=='playing'){setView({...world.current});published=now;}
    frame=requestAnimationFrame(tick);
   }
@@ -62,7 +68,8 @@ function Arcade({friendId,collection='generations',client,paused}:GameComponentP
  const start=()=>{if(paused||!ready)return;sfx.play('tap');world.current=createGame();setView(world.current);keys.current.clear();touch.current.clear();setStarted(true);setManualPause(false);canvas.current?.focus();};
  const bind=(action:string)=>({onPointerDown:(e:React.PointerEvent<HTMLButtonElement>)=>{if(!active)return;e.preventDefault();e.currentTarget.setPointerCapture(e.pointerId);touch.current.set(e.pointerId,action);},onPointerUp:(e:React.PointerEvent<HTMLButtonElement>)=>{touch.current.delete(e.pointerId);},onPointerCancel:(e:React.PointerEvent<HTMLButtonElement>)=>{touch.current.delete(e.pointerId);},onLostPointerCapture:(e:React.PointerEvent<HTMLButtonElement>)=>{touch.current.delete(e.pointerId);}});
  const finished=view.status!=='playing';
- return <section className="arcade" lang={lang} aria-label="Rare Invaders">
+ // Long-press on the field or the thumb buttons must not open the browser menu mid-fight.
+ return <section className="arcade" lang={lang} aria-label="Rare Invaders" onContextMenu={e=>e.preventDefault()}>
  <header><div className="brand"><small>RARE FRIENDS / ARCADE 01</small><h1>RARE <span>INVADERS</span></h1></div><div className="top-actions"><button className={`sound-toggle${sound?'':' off'}`} onClick={()=>{toggleSoundRef.current();if(started)canvas.current?.focus();}} disabled={paused||!ready} aria-pressed={sound} aria-label={t('効果音','Sound effects')} title={t('効果音 オン/オフ（M）','Sound effects on/off (M)')} aria-keyshortcuts="M"><span aria-hidden="true">♪</span></button><button onClick={()=>{setLang(lang==='ja'?'en':'ja');if(started)canvas.current?.focus();}}>{lang==='ja'?'English':'日本語'}</button>{started&&!finished&&<button disabled={paused} aria-label={t('一時停止','Pause')} onClick={()=>setManualPause(true)}>Ⅱ</button>}</div></header>
  <div className="game-layout"><div className="cabinet"><div className="hud"><div><small>SCORE</small><strong data-testid="score">{String(view.score).padStart(6,'0')}</strong></div><div><small>WAVE</small><strong>{String(view.wave).padStart(2,'0')} / 05</strong></div><div><small>LIVES</small><strong className="hearts">{'♥'.repeat(view.lives)}{'·'.repeat(Math.max(0,3-view.lives))}</strong></div></div>
  <div className="screen"><canvas ref={canvas} width={WIDTH} height={HEIGHT} tabIndex={0} aria-label={t('矢印キーで移動、スペースで射撃、Shiftでシールド','Arrow keys move, Space fires, Shift shields')}/>
