@@ -206,8 +206,19 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
     const l = realRef.current.ledger.current, e = realRef.current.shown.current;
     return s.phase === 'mine' && l && e !== null && canRealBet(l, e) ? { ...s, phase: 'confirm' } : s;
   }
-  const doBet = () => act(s => s.phase === 'confirm' ? cancelBet(s) : s.mode === 'real' ? askReal(s) : askBet(s));
   const doAsk = () => act(s => s.mode === 'real' ? askReal(s) : askBet(s));
+  /** Double push: after a win (streak > 0) the next bet skips the odds dialog, until a loss or a withdraw ends the run. */
+  function doDouble() {
+    const s = game.current;
+    if (!s || s.phase !== 'mine' || s.streak <= 0) return;
+    doAsk();
+    if (game.current?.phase === 'confirm') doConfirm();
+  }
+  function doBet() {
+    const s = game.current;
+    if (s?.phase === 'confirm') { act(cancelBet); return; }
+    if (s && s.streak > 0) doDouble(); else doAsk();
+  }
   function doConfirm() {
     const s = game.current, l = realRef.current.ledger.current;
     if (!s || s.phase !== 'confirm' || !activeRef.current) return;
@@ -229,8 +240,8 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
     if (s.sound) audio.current?.hush();
     commit(setSound(s, !s.sound));
   };
-  const handlers = useRef({ strike, doWithdraw, doAsk, doConfirm, doCancel, toggleSound, pauseNow });
-  handlers.current = { strike, doWithdraw, doAsk, doConfirm, doCancel, toggleSound, pauseNow };
+  const handlers = useRef({ strike, doWithdraw, doBet, doConfirm, doCancel, toggleSound, pauseNow });
+  handlers.current = { strike, doWithdraw, doBet, doConfirm, doCancel, toggleSound, pauseNow };
 
   useEffect(() => {
     const blur = () => handlers.current.pauseNow();
@@ -253,7 +264,7 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
       if (s.phase === 'confirm' && (key === 'n' || key === 'escape')) { e.preventDefault(); h.doCancel(); return; }
       if ((key === ' ' || key === 'enter') && !onButton) { e.preventDefault(); if (!e.repeat) h.strike(); return; }
       if (key === 'w' && !e.repeat) { e.preventDefault(); h.doWithdraw(); return; }
-      if (key === 'b' && !e.repeat) { e.preventDefault(); h.doAsk(); }
+      if (key === 'b' && !e.repeat) { e.preventDefault(); h.doBet(); }
     };
     window.addEventListener('keydown', down);
     for (const type of unlockOn) window.addEventListener(type, unlock, { passive: true });
@@ -381,7 +392,7 @@ function Mine({ friendId, collection = 'generations', client, paused }: GameComp
     </StatsPanel>}
     <p className="sr-only" role="status" aria-live="polite">{announcement(lang, banner, toast)}</p>
     <footer>
-      <span>{tt('タップ/Space: ほる · W: 引き出す · B: 倍かけ · Y/N: 決定/やめる · M: 音 · P: 一時停止', 'Tap/Space: strike · W: withdraw · B: bet · Y/N: confirm/cancel · M: sound · P: pause')}</span>
+      <span>{tt('タップ/Space: ほる · W: 引き出す · B: 倍かけ（当たり後はすぐダブル） · Y/N: 決定/やめる · M: 音 · P: 一時停止', 'Tap/Space: strike · W: withdraw · B: bet (after a win: double at once) · Y/N: confirm/cancel · M: sound · P: pause')}</span>
       <span>{pick(lang, real ? BET_SIM_NOTE : SIM_NOTE)}</span>
     </footer>
     {(saveError || loadError || shareError) && <p className="error" role="alert">{shareError ? tt('シェアを開けませんでした。もう一度お試しください。', 'Could not open sharing. Please retry.')

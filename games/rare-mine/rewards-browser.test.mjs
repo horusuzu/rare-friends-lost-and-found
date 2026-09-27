@@ -112,15 +112,22 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     let wins = 0, losses = 0, best = 0, sawBet = false, sawBurn = false, sawWinFx = false, sawLoseFx = false;
     for (let round = 0; round < 40 && !(wins && losses); round++) {
       await until('pot to bet', async () => await attr('phase') === 'mine' && await game.getByTestId('bet').isEnabled());
-      await tap('bet');
-      await until('odds shown', async () => await attr('phase') === 'confirm');
-      await game.getByTestId('odds').getByText('勝率45%・勝てば2倍・負ければ全額バーン', { exact: true }).waitFor();
-      await game.getByTestId('bet-sim-note').getByText(BET_NOTE, { exact: true }).waitFor();
-      assert.ok(await game.getByTestId('withdraw').isEnabled(), 'Withdraw stays available beside the odds');
-      if (!sawBet) { sawBet = true; await shot('bet'); }
       const expect = betOutcome(await num('betseed'))[0] ? 'win' : 'lose';
       const b0 = await ledger();
-      await tap('confirm-bet');
+      if (b0.streak > 0) {
+        // Double push: after a win the next bet goes straight to the reach, with no odds dialog.
+        await game.getByTestId('bet').getByText(/^勝率45%・すぐかけ（シミュ）$/).waitFor();
+        await tap('bet');
+        assert.equal(await game.getByTestId('confirm').count(), 0, 'no odds dialog while doubling a winning pot');
+      } else {
+        await tap('bet');
+        await until('odds shown', async () => await attr('phase') === 'confirm');
+        await game.getByTestId('odds').getByText('勝率45%・勝てば2倍・負ければ全額バーン', { exact: true }).waitFor();
+        await game.getByTestId('bet-sim-note').getByText(BET_NOTE, { exact: true }).waitFor();
+        assert.ok(await game.getByTestId('withdraw').isEnabled(), 'Withdraw stays available beside the odds');
+        if (!sawBet) { sawBet = true; await shot('bet'); }
+        await tap('confirm-bet');
+      }
       // The reach plays; the simulated label stays on screen; tap to skip to the result.
       await until('reach', async () => await attr('fx') === 'reach' && await attr('phase') === 'roll');
       await game.getByTestId('stats-note').getByText(BET_NOTE, { exact: true }).waitFor();

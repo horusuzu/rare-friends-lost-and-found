@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { newGame, tick, tap, withdraw, askBet, cancelBet, confirmBet, skipRoll, betOutcome, setSound } from './game.ts';
+import { newGame, tick, tap, withdraw, askBet, cancelBet, confirmBet, skipRoll, betOutcome, setSound, canDoubleAgain, doubleAgain } from './game.ts';
 import { MAX_STREAK, PAYOUT, ROLL_TIME, WIN_CHANCE } from './economy.ts';
 import { mix } from './rng.ts';
 import { TOKEN, withPot, run, balanced } from './test-kit.mjs';
@@ -139,4 +139,31 @@ test('confirming and settling a bet ask for a save; the sound toggle too', () =>
   const quiet = setSound(s, false);
   assert.equal(quiet.sound, false); assert.ok(quiet.saveTick > s.saveTick);
   assert.equal(setSound(quiet, true).sound, true);
+});
+
+test('after a win the pot can be doubled again at once, with no odds dialog, until a loss', () => {
+  // Owner request 2026-09-27: after a hit, keep pushing "double" straight away until it misses.
+  const seed = seedFor([true, true, false]);
+  const fresh = withPot(seed, 10);
+  assert.equal(canDoubleAgain(fresh), false, 'the first bet of a pot still goes through the odds dialog');
+  assert.equal(doubleAgain(fresh), fresh);
+  const won = bet(fresh);
+  assert.equal(won.streak, 1); assert.equal(won.pot, 20);
+  assert.equal(canDoubleAgain(won), true);
+  const rolling = doubleAgain(won, 0);
+  assert.equal(rolling.phase, 'roll', 'goes straight to the roll');
+  assert.equal(rolling.roll.stake, 20);
+  const twice = skipRoll(rolling);
+  assert.equal(twice.streak, 2); assert.equal(twice.pot, 40);
+  const lost = skipRoll(doubleAgain(twice, 0));
+  assert.equal(lost.streak, 0); assert.equal(lost.pot, 0);
+  assert.equal(canDoubleAgain(lost), false, 'after a miss the next bet asks again');
+});
+
+test('double-again respects the streak cap, a withdraw and a rolling bet', () => {
+  const won = bet(withPot(seedFor([true]), 10));
+  assert.equal(canDoubleAgain({ ...won, streak: MAX_STREAK }), false);
+  assert.equal(canDoubleAgain(withdraw(won)), false, 'banking ends the run');
+  assert.equal(canDoubleAgain(doubleAgain(won, 5)), false, 'no second bet while one is rolling');
+  assert.equal(canDoubleAgain({ ...won, mode: 'real' }), false, 'real mode is driven by its own ledger');
 });

@@ -81,7 +81,7 @@ kbd{font:700 .75em ui-monospace,monospace;padding:0 .3em;border-radius:.3em;back
 .actions{grid-area:act;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .actions button{min-height:56px;display:flex;flex-direction:column;justify-content:center;gap:2px;padding:6px 10px;border:0;border-radius:14px;text-align:center;
   transition:transform var(--fast) var(--ease),box-shadow var(--fast) var(--ease)}
-.actions b{font:900 19px/1 var(--display);letter-spacing:1px;white-space:nowrap}.actions small{font-size:11px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.actions b{font:900 19px/1 var(--display);letter-spacing:1px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}.actions small{font-size:11px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .withdraw{background:linear-gradient(#fff1a8,#f5c542 60%,#d9a232);color:var(--ink);box-shadow:0 5px 0 var(--gold-lo)}
 .bet{background:linear-gradient(#ff9a4e,#e04a2a 65%,#b8321c);color:#fff8ec;box-shadow:0 5px 0 #7a1c10}
 .actions button:hover:not(:disabled){filter:brightness(1.08) saturate(1.1)}

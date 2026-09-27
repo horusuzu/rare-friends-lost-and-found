@@ -231,6 +231,16 @@ export function confirmBet(s: MineState, suspense = ROLL_TIME): MineState {
   return askSave(next);
 }
 
+/**
+ * Double push: after a win the pot can be staked again straight away, with no odds dialog, until a bet is lost
+ * (the streak resets to 0), the pot is withdrawn or the streak cap is reached. The first bet of a pot still shows the
+ * odds. Practice mode only; real mode chains its own ledger in the shell.
+ */
+export const canDoubleAgain = (s: MineState): boolean => s.mode !== 'real' && s.streak > 0 && canBet(s);
+export function doubleAgain(s: MineState, suspense = ROLL_TIME): MineState {
+  return canDoubleAgain(s) ? confirmBet(askBet(s), suspense) : s;
+}
+
 /** Reveal a rolling bet at once. */
 export function skipRoll(s: MineState): MineState { return s.phase === 'roll' ? settle(s) : s; }
 

@@ -86,18 +86,35 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     assert.equal(await num('streak'), 0);
 
     // Bet: odds first, then a fixed, seeded outcome. Keep betting until both a win and a loss have happened.
-    let wins = 0, losses = 0, maxStreak = 0, sawBet = false, sawBurn = false, sawWinFx = false, sawLoseFx = false;
+    let wins = 0, losses = 0, maxStreak = 0, sawBet = false, sawDouble = false, sawBurn = false, sawWinFx = false, sawLoseFx = false;
     for (let round = 0; round < 40 && !(wins && losses && (maxStreak >= 2 || round >= 14)); round++) {
       await until('pot to bet', async () => await num('pot') > 0 && await attr('phase') === 'mine');
-      for (let n = 0; n < 12 && await num('pot') < 12; n++) await rock();
-      await tap('bet');
-      await until('odds shown', async () => await attr('phase') === 'confirm');
-      await game.getByTestId('odds').getByText('勝率45%・勝てば2倍・負ければ全額バーン', { exact: true }).waitFor();
-      assert.ok(await game.getByTestId('withdraw').isEnabled(), 'Withdraw stays available while the odds are shown');
-      if (!sawBet) { sawBet = true; await shot('bet'); }
+      const streak = await num('streak');
+      if (streak === 0) for (let n = 0; n < 12 && await num('pot') < 12; n++) await rock();
       const seed = await num('betseed'), expect = betOutcome(seed)[0] ? 'win' : 'lose';
-      const lastId = await num('lastid'), stake = await num('pot'), burned = await num('burned'), streak = await num('streak');
-      await tap('confirm-bet');
+      const lastId = await num('lastid'), burned = await num('burned');
+      let stake = 0;
+      if (streak > 0) {
+        // Double push: after a win the Bet button reads "ダブル ×N" and bets at once, with no odds dialog.
+        assert.equal(await game.getByTestId('bet').locator('b').getAttribute('data-double'), 'true');
+        await game.getByTestId('bet').getByText(`ダブル ×${2 ** (streak + 1)}`, { exact: true }).waitFor();
+        await game.getByTestId('bet').getByText(/^勝率45%・すぐかけ$/).waitFor();
+        if (!sawDouble) await shot('double');
+        await tap('bet');
+        assert.equal(await game.getByTestId('confirm').count(), 0, 'no odds dialog while doubling a winning pot');
+        // Practice mining keeps adding to the pot until the bet starts; the stake is the pot once it is rolling.
+        await until('double rolling', async () => await attr('phase') === 'roll');
+        stake = await num('pot');
+        sawDouble = true;
+      } else {
+        await tap('bet');
+        await until('odds shown', async () => await attr('phase') === 'confirm');
+        await game.getByTestId('odds').getByText('勝率45%・勝てば2倍・負ければ全額バーン', { exact: true }).waitFor();
+        assert.ok(await game.getByTestId('withdraw').isEnabled(), 'Withdraw stays available while the odds are shown');
+        if (!sawBet) { sawBet = true; await shot('bet'); }
+        stake = await num('pot');  // mining is paused while the odds are shown
+        await tap('confirm-bet');
+      }
       // The pachinko reach plays (2.5–4 s); its tier is cosmetic. Tap to skip straight to the result.
       await until('reach', async () => await attr('fx') === 'reach' && await attr('phase') === 'roll');
       assert.ok(['0', '1', '2'].includes(await attr('reach-tier')), 'reach tier');
@@ -122,6 +139,7 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     }
     assert.ok(wins > 0 && losses > 0, `both outcomes seen (${wins} wins, ${losses} losses)`);
     assert.ok(sawWinFx && sawLoseFx, 'the win and burn effects both appeared');
+    if (maxStreak >= 2) assert.ok(sawDouble, 'a win was doubled again with no odds dialog');
     assert.equal(await num('best'), maxStreak, 'best streak stat');
     assert.equal(await num('won'), wins); assert.equal(await num('lost'), losses);
     assert.match(await game.getByTestId('stat-burned').textContent(), new RegExp(`🔥 ${(await num('burned')).toLocaleString('en-US')}`));
@@ -129,6 +147,12 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     assert.match(await game.getByTestId('stat-best').textContent(), new RegExp(`×${2 ** maxStreak}`));
     await inSheet(() => game.getByTestId('share').waitFor());
 
+    // A winning run skips the odds (double push); banking ends the run, so the next bet asks again.
+    const endRun = async () => {
+      if (await num('streak') === 0) return;
+      await tap('withdraw'); await until('run banked', async () => await num('streak') === 0 && await attr('phase') === 'mine');
+    };
+    await endRun();
     // Cancel keeps the pot; Withdraw is offered right beside the odds.
     await until('pot for cancel', async () => await num('pot') > 0);
     await tap('bet'); await until('confirm', async () => await attr('phase') === 'confirm');
@@ -155,6 +179,7 @@ for (const [width, height] of sizes) console.log(await testGame('./games/rare-mi
     const setMotion = async want => { if (await attr('reduced') !== want) await game.getByTestId('motion').click(); await until(`reduced=${want}`, async () => await attr('reduced') === want, 3000); };
     await page.keyboard.press('p'); await setMotion('true');
     await game.getByRole('button', { name: '再開する', exact: true }).click(); await until('resumed reduced', async () => await attr('paused') === 'false');
+    await endRun();
     await until('pot for reduced bet', async () => await num('pot') > 0 && await attr('phase') === 'mine');
     const reducedId = await num('lastid');
     await tap('bet'); await until('confirm reduced', async () => await attr('phase') === 'confirm');

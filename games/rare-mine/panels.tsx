@@ -60,8 +60,11 @@ export function ActionBar({ lang, real, pot, canWithdraw, canBet, streak, hint, 
       <small>{real ? pick(lang, [`${pot} RF を記録`, `Record ${pot} RF`]) : pick(lang, [`${pot} を安全な残高へ`, `Bank ${pot} safely`])}</small>
     </button>
     <button className="bet" data-testid="bet" disabled={!canBet} onClick={onBet} aria-describedby="odds-line">
-      <b>{pick(lang, ['倍かけ', 'Double or burn'])}{streak > 0 ? ` ×${multiplier(streak)}` : ''}</b>
+      <b data-double={String(streak > 0 && !capped)}>{streak > 0 && !capped
+        ? pick(lang, [`ダブル ×${multiplier(streak + 1)}`, `Double ×${multiplier(streak + 1)}`])
+        : <>{pick(lang, ['倍かけ', 'Double or burn'])}{streak > 0 ? ` ×${multiplier(streak)}` : ''}</>}</b>
       <small id="odds-line">{capped ? pick(lang, [`${MAX_STREAK}連勝で上限・引き出そう`, `Cap of ${MAX_STREAK} wins: withdraw`])
+        : streak > 0 ? pick(lang, [`勝率${WIN_PCT}%・すぐかけ${real ? '（シミュ）' : ''}`, `${WIN_PCT}% · bets at once${real ? ' (sim)' : ''}`])
         : real ? pick(lang, [`勝率${WIN_PCT}%・2倍（シミュ）`, `${WIN_PCT}% to double (simulated)`]) : pick(lang, [`勝率${WIN_PCT}%・勝てば${PAYOUT}倍`, `${WIN_PCT}% to double`])}</small>
     </button>
   </div>;
