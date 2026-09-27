@@ -6,6 +6,7 @@ html,body{background:#140f0c;overscroll-behavior:none;-webkit-text-size-adjust:1
 .rf-frame-toolbar .rf-frame-mode{background:#1f1713;color:#f5c542;border:0}
 .rf-frame-viewport{order:1}
 .rf-frame-toolbar .rf-frame-pet[aria-pressed=true]{background:#f5c542;color:#140f0c;border-color:#f5c542}
+.rf-frame-toolbar .rf-frame-pet[aria-pressed=true]:hover:not(:disabled){background:#ffd75e;color:#140f0c}
 .rf-frame-toolbar button:focus-visible{outline:2px solid #f5c542;outline-offset:2px}
 /* Phones: edge to edge, and one compact 48px toolbar row (44px targets, 12px text) that keeps the wallet identity visible. */
 @media(max-width:650px),(max-height:500px){
