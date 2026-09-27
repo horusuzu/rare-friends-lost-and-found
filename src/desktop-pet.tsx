@@ -74,7 +74,8 @@ export function useDesktopPet(options: DesktopPetOptions) {
       entry.win = win;
       // Its own ✕ (or the game tab navigating away) ends the pet.
       win.addEventListener('pagehide', () => { if (active.current === entry) close(); }, { once: true });
-      entry.teardown = startPet(win, opts, session, game.title);
+      try { entry.teardown = startPet(win, opts, session, game.title); }
+      catch { close(); }
     }, () => { if (active.current === entry) close(); });
   }, [close]);
 
