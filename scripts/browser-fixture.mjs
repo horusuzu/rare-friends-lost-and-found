@@ -99,6 +99,8 @@ export async function installFixture(page, origin, { artworkCall, initialChain =
     } else throw new Error(`Unexpected public RPC method: ${request.method}`);
     return { jsonrpc: "2.0", id: request.id, result };
   }
+  // Lets a more specific route answer the rest of a mixed JSON-RPC batch from this fixture.
+  state.answer = answer;
   await page.route("**/*", async route => {
     try {
       const url = new URL(route.request().url());

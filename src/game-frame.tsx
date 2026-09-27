@@ -21,6 +21,8 @@ export type GameFrameProps = {
   selectionMode?: "picker" | "host";
   onConnect?: () => void; wallet?: GameWalletState; confirmation?: GameConfirmation | null;
   connection?: ReactNode; walletActions?: ReactNode;
+  /** Trusted host controls placed after the wallet button, e.g. the desktop pet toggle. Never game code. */
+  toolbarActions?: ReactNode;
   mode: "preview" | "live"; onMenuChange?: (open: boolean) => void;
 };
 
@@ -49,7 +51,7 @@ export function GameMenu({ title, onClose, children, footer }: { title: string; 
   </div></div>;
 }
 
-export function GameFrame({ children, friends, selectedFriendId, selectedFriendCollection = "generations", onSelectFriend, friendsLoading, friendsError, friendsEmptyMessage = "No playable Friends found.", friendsHiddenCount = 0, onConnect, wallet, confirmation, connection, walletActions, selectionMode = "picker", mode, onMenuChange }: GameFrameProps) {
+export function GameFrame({ children, friends, selectedFriendId, selectedFriendCollection = "generations", onSelectFriend, friendsLoading, friendsError, friendsEmptyMessage = "No playable Friends found.", friendsHiddenCount = 0, onConnect, wallet, confirmation, connection, walletActions, toolbarActions, selectionMode = "picker", mode, onMenuChange }: GameFrameProps) {
   const [menu, setMenu] = useState<"friends" | "wallet" | null>(null);
   const friend = friends.find(value => value.id === selectedFriendId && (value.collection ?? "generations") === selectedFriendCollection);
   const selecting = selectionMode === "picker" && (!friend || menu === "friends");
@@ -62,6 +64,7 @@ export function GameFrame({ children, friends, selectedFriendId, selectedFriendC
         {selectionMode === "host" ? <span className="rf-frame-selected-friend">{friend?.label ?? "Choose a Friend"}</span>
           : <button type="button" onClick={() => setMenu("friends")} aria-label="Choose Friend">{friend?.label ?? "Choose Friend"}</button>}
         <button type="button" onClick={() => setMenu("wallet")} disabled={!friend} aria-label="Open Friend wallet">Friend wallet</button>
+        {toolbarActions}
       </div>
       <div className="rf-frame-viewport">{children}</div>
     </div>

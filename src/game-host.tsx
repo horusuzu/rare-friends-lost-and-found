@@ -7,6 +7,8 @@ const WALLET_ABI = parseAbi(["function tokenBoundAccount(uint256 tokenId) view r
 import {ScoreShareDialog,type ScoreShare} from "./score-share.js";
 import {scoreGame} from "./score-games.js";
 import { readFriendRewards } from './friend-rewards.js';
+import { DesktopPetButton, useDesktopPet } from './desktop-pet.js';
+import { createFriendReader, createGenesisReader } from './friend-sprites.js';
 import { bindGameFrame, createPreviewLocalStore, type GameArguments, type GameMethod } from "./frame-bridge.js";
 import { GameFrame, type GameConfirmation, type GameFriend, type GameFrameProps } from "./game-frame.js";
 import { createGamePreview, maximumPrize, RF, type ChanceGameDefinition, type GameSnapshot, type GameClient, type PreviewGameClient } from "./game.js";
@@ -221,11 +223,11 @@ function EligibilityGate({ allowGenesisPreview, linkedGenesisId, definition, pic
     ledgers.set(ledgerKey, client);
   }
   // Remount both the bridge and child on any identity/network/URL change.
-  return <EmbeddedSession key={frameUrl} picker={picker} friend={{ ...friend, kind: "owned", walletAddress: checked.walletAddress }} client={client} definition={definition} frameUrl={frameUrl} rewards={{ publicClient, account: account as Address, genesisId: linkedGenesisId }} />;
+  return <EmbeddedSession key={frameUrl} picker={picker} friend={{ ...friend, kind: "owned", walletAddress: checked.walletAddress }} client={client} definition={definition} frameUrl={frameUrl} rewards={{ publicClient, account: account as Address, genesisId: linkedGenesisId, chainId }} />;
 }
 
 function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, rewards }: {
-  friend: GameFriend; client?: GameClient; definition: ChanceGameDefinition; live?: LiveGameOptions; frameUrl: string; picker?: Picker; rewards?: { publicClient: GenerationIdentityClient; account: Address; genesisId?: bigint };
+  friend: GameFriend; client?: GameClient; definition: ChanceGameDefinition; live?: LiveGameOptions; frameUrl: string; picker?: Picker; rewards?: { publicClient: GenerationIdentityClient; account: Address; genesisId?: bigint; chainId: number };
 }) {
   const liveRef = useRef(live); liveRef.current = live;
   const mode = live ? "live" : "preview";
@@ -389,6 +391,19 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, r
     };
   }, [client, definition, friend.id, friend.collection, attempt, rewards?.publicClient, rewards?.account, rewards?.genesisId]);
 
+  // Desktop pet: trusted host UI, read-only, preview reward sessions only. It closes whenever this session is not
+  // ready or its identity changes (petSessionKey), and on unmount (Friend/account/network change or disconnect).
+  const petContext = rewards && !live && friend.walletAddress ? rewards : undefined;
+  const readPetRewards = useMemo(() => petContext ? () => readFriendRewards(petContext.publicClient, {
+    friendId: friend.id, collection: friend.collection, account: petContext.account, walletAddress: friend.walletAddress as Address,
+  }) : undefined, [petContext?.publicClient, petContext?.account, friend.id, friend.collection, friend.walletAddress]);
+  const pet = useDesktopPet({
+    gameName: definition.name, label: friend.label, readRewards: readPetRewards,
+    session: petContext && status === "ready" ? { friendId: friend.id, collection: friend.collection ?? "generations", account: petContext.account,
+      chainId: petContext.chainId, walletAddress: friend.walletAddress!, running: true } : null,
+    loadSprites: () => (friend.collection === "genesis" ? createGenesisReader() : createFriendReader()).read(friend.id),
+  });
+
   async function topUp() {
     if (fundingRef.current || actionPending.current || !liveRef.current) return;
     fundingRef.current = true; setFunding(true); setFundMessage("");
@@ -417,6 +432,7 @@ function EmbeddedSession({ friend, client, definition, live, frameUrl, picker, r
       {transactionPending && <p role="status">Finish the pending game action before transferring RF.</p>}
       {fundMessage && <p role="status">{fundMessage}</p>}
     </div> : rewards ? <div className="rf-runtime-connection"><p>実際の報酬の受取・アクティベートは公式サイトで行えます。このゲームから取引は送りません。</p><a href="https://rarefriends.com/portfolio" target="_blank" rel="noopener noreferrer">公式で確認・受取 ↗</a><p className="rf-frame-note">このパネルの demo RF はゲーム内の模擬残高です。実残高はおうちの貯金箱で確認してください。</p></div> : undefined}
+    toolbarActions={pet.visible ? <DesktopPetButton open={pet.open} onToggle={pet.toggle} /> : undefined}
     confirmation={confirmation} onMenuChange={onMenuChange} {...picker}>
     <iframe key={attempt} ref={iframe} src={frameUrl} title={definition.name} sandbox="allow-scripts" referrerPolicy="no-referrer" />
     {scoreShare && <ScoreShareDialog result={scoreShare} friendId={friend.id} collection={friend.collection ?? "generations"} gameName={definition.name} onClose={()=>{sharing.current=false;setScoreShare(null);bridge.current?.setPaused(paused.current || fundingRef.current);}}/>}

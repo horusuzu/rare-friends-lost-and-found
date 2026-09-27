@@ -17,23 +17,28 @@ const REWARD_READS = new Set(['activationManager', 'positions', 'retired', 'rf',
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
 
 /**
- * Route reward reads. `state` is live: set `inactive` (not activated: position weight 0) or `failed` (RPC errors) at any
+ * Route reward reads. Pass `fixture` (from installFixture) when several host readers share the batched client, so
+ * mixed batches still get one answer. `state` is live: set `inactive` (not activated: position weight 0) or `failed` (RPC errors) at any
  * time, or change `base` / `perSecond`. Claimable RF = base + perSecond × seconds since the route was installed.
  */
 export async function routeRewards(page, { owner, friendWallet = '0x3333333333333333333333333333333333333333', genesisWallet = '0x4444444444444444444444444444444444444444',
-  base = 38n * RF + RF / 2n, perSecond = RF / 2n } = {}) {
+  base = 38n * RF + RF / 2n, perSecond = RF / 2n, fixture } = {}) {
   const t0 = Date.now();
   const state = { base, perSecond, weth: 187n * 10n ** 14n, inactive: false, failed: false, reads: 0 };
   const earned = () => state.base + state.perSecond * BigInt(Date.now() - t0) / 1000n;
   await page.route(RPC, async route => {
     if (route.request().method() !== 'POST') return route.fallback();
     const raw = route.request().postDataJSON(), requests = Array.isArray(raw) ? raw : [raw];
-    let decoded;
-    try { decoded = requests.map(r => { if (r.method !== 'eth_call') throw new Error('not a call'); return decodeFunctionData({ abi, data: r.params[0].data }); }); }
-    catch { return route.fallback(); }
+    // Undecodable entries are other reads (identity, artwork, block number). With `fixture` (installFixture's state),
+    // a batch mixing them with reward reads is answered in one response, as a real RPC would; without it, it falls back.
     const token = r => same(r.params[0].to, D.rf) || same(r.params[0].to, D.weth);
-    if (!decoded.some((d, i) => REWARD_READS.has(d.functionName) || (d.functionName === 'balanceOf' && token(requests[i])))) return route.fallback();
-    if (decoded.some(d => d.functionName === 'earned')) state.reads++;
+    const decoded = requests.map(r => {
+      try { const d = r.method === 'eth_call' ? decodeFunctionData({ abi, data: r.params[0].data }) : null; return d && d.functionName === 'balanceOf' && !token(r) ? null : d; }
+      catch { return null; }
+    });
+    if (decoded.includes(null) && !fixture?.answer) return route.fallback();
+    if (!decoded.some((d, i) => d && (REWARD_READS.has(d.functionName) || (d.functionName === 'balanceOf' && token(requests[i]))))) return route.fallback();
+    if (decoded.some(d => d?.functionName === 'earned')) state.reads++;
     const answer = (r, { functionName: f, args }) => {
       if (state.failed) return { jsonrpc: '2.0', id: r.id, error: { code: -32000, message: 'Fixture unavailable' } };
       const genesis = same(r.params[0].to, D.genesis);
@@ -45,7 +50,9 @@ export async function routeRewards(page, { owner, friendWallet = '0x333333333333
       };
       return { jsonrpc: '2.0', id: r.id, result: encodeFunctionResult({ abi, functionName: f, result: values[f] }) };
     };
-    const response = requests.map((r, i) => answer(r, decoded[i]));
+    let response;
+    try { response = await Promise.all(requests.map((r, i) => decoded[i] ? answer(r, decoded[i]) : fixture.answer(r))); }
+    catch (error) { fixture?.errors.push(error.message); return route.abort('blockedbyclient'); }
     await route.fulfill({ json: Array.isArray(raw) ? response : response[0], headers: { 'access-control-allow-origin': '*' } });
   });
   return state;
