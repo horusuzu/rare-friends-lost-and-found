@@ -312,6 +312,7 @@ below describe implementation work, not restrictions on submission ideas.
 | Planned RNG subsidy | Rare Friends plans to subsidize RNG costs for all developers. | Not implemented by the demo; its wallet-paid RNG flow demonstrates the cost. |
 | Creator fees | No creator royalty, revenue-share or fee-claim actions. | Prize stake and developer free-stake withdrawals are separate contract operations. |
 | Wearable NFTs | No hat purchase, mint, equip or item-for-hat actions. | Requires separately scoped NFT capabilities. |
+| Desktop pet (fork host) | Trusted `DesktopPetButton` / `useDesktopPet` open a Document Picture-in-Picture window with the selected Friend and its real, read-only unclaimed RF, for games in the fixed `PET_GAMES` table (`src/pet-games.ts`). `GameFrame` accepts trusted `toolbarActions`. | Desktop Chrome/Edge 116+ only; hidden elsewhere. Game code cannot open, address or configure it; it closes on any identity change or session end. No transactions. |
 | Publication | Public playable previews on GitHub Pages or other static hosts; developer-controlled preview workflows are allowed. | Official production publication through Rare Friends requires review and agreement. This repository's CI remains checks-only. |
 
 ## On-chain phase

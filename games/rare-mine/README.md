@@ -256,6 +256,38 @@ spin, and a 0.3 s reveal. The odometer rolls with transforms only. Controls are 
 least 44 px, the combo exposes `role="meter"` and results are announced with `role="status"`.
 Layouts are checked at 320 × 568, 390 × 844, 844 × 390, 960 × 640 and 1100 × 900 with no overflow.
 
+## Desktop pet
+
+A small always-on-top window with your Friend mining beside your desktop while you work in other
+tabs or apps, toggled from the host toolbar. It is **trusted host UI**, not game code: the sandboxed
+game cannot open, address or configure it.
+
+- **Where.** Desktop Chrome and Edge **116+** only (the browser's Document Picture-in-Picture window:
+  always on top, movable to a screen edge, nothing to install). The **🐾 Pet** / **🐾 ペット** button
+  appears next to **Friend wallet** only when the browser has `documentPictureInPicture`, a verified
+  Friend session is running, and the game is in the host's fixed pet table (`src/pet-games.ts`, only
+  Rare Mine). Safari, Firefox and phones never show it, and the phone host bar is unchanged.
+- **Toggle.** Click **🐾 Pet** (`aria-pressed`, 44 px) to open the window; click it again, or close the
+  window with its own ✕, to turn it off. It also closes when you change Friend, account or network,
+  disconnect, or the game session ends or reloads.
+- **What it shows.** Your Friend's canonical sprite on a rock ledge, swinging a pickaxe at an ore face;
+  coins pop and arc into a small pile, about 1–4 a second at your NFT's real accrual (the same 1-2-5
+  coin unit as the mine, capped at 4 a second). Below it, an odometer of the Friend's **real unclaimed
+  RF**, a 「+16.4 RF/分」 rate badge and 「読み取りのみ・本物のRF」. The host reads the rewards itself
+  with the same read-only reader the game uses (`readFriendRewards`): a read at once, a quick second
+  read after 5 s for the rate, then every 20 s, never overlapping, paused while the pet window is
+  hidden, backing off on errors (2 s, 5 s, then 20 s doubling; 40 s up to 160 s after a success). The
+  value is interpolated between reads with the measured rate (at most 30 s ahead) and never runs
+  backwards except after a claim on the official site.
+- **No rewards or failed reads.** A Friend that is not activated or does not accrue idles with
+  「報酬なし」; when reads fail it idles with 「読み取り失敗・再試行中」 and keeps retrying.
+- **Sound and motion.** A soft coin clink, **off** by default, toggled with the tiny ♪ in the pet;
+  audio starts only from that click. With reduced motion there is no swinging, flicker or coins:
+  just the sprite and the counter.
+- **Read-only.** Clicking the pet shows 「Rare Mine に戻る → 元のタブへ」 (a browser cannot reliably
+  focus the game tab for you). There are no links, navigation, transactions or signatures, and no
+  network endpoints beyond the existing Robinhood RPC reads.
+
 ## Phones
 
 On short portrait screens (a game frame under 760 px tall, e.g. an iPhone with Safari's bars) the mine
@@ -305,6 +337,10 @@ taken from a save: only the ledger's own bookkeeping is.
 - If reading the save fails (not a malformed save), the title shows **Try again** (もう一度よむ);
   starting a new mine instead replaces the unread save at the next autosave.
 - Coin particles, flames and sounds use browser randomness for presentation only.
+- The desktop pet is tested headlessly through a popup stub; the real Document Picture-in-Picture
+  window (always on top, its own ✕, its size limits) needs a manual check in desktop Chrome or Edge.
+  If the game tab stays in the background for long, the browser may slow the host's RPC reads; the
+  pet keeps interpolating meanwhile.
 
 ## Development and verification
 
@@ -319,6 +355,7 @@ MINE_SIZE='[[390,844]]' node games/rare-mine/rewards-browser.test.mjs
 MINE_SIZE='[[390,844]]' node games/rare-mine/browser.test.mjs
 MINE_SIZE='[390]' node games/rare-mine/genesis-browser.test.mjs
 MINE_SIZE='[[390,664]]' node games/rare-mine/mobile.test.mjs
+MINE_SIZE='[1100]' node games/rare-mine/pet-browser.test.mjs
 node scripts/dev-game.mjs build games/rare-mine --outdir release-mine
 ```
 
@@ -329,7 +366,10 @@ Engine modules (`rng`, `economy`, `game`, `feed`, `real`, `save`) are pure and d
 a test-only reward RPC fixture whose claimable RF grows with the clock; it checks the rate badge,
 that the odometer rises between polls, withdraw and bet moving the baseline, the pot identity, the
 labels, reload and the practice fallback. `browser.test.mjs` covers practice mode (a not-activated
-Friend) and `genesis-browser.test.mjs` Genesis #597's real rewards. Every browser wait polls `data-*`
+Friend) and `genesis-browser.test.mjs` Genesis #597's real rewards. `pet-browser.test.mjs` stubs
+`documentPictureInPicture.requestWindow` with a same-origin popup (headless Chromium has no Document
+Picture-in-Picture) and checks the toggle's gating, the pet's canvas, counter, rate and statuses, OFF,
+the window's own close and closing on Friend and account changes. Every browser wait polls `data-*`
 state; each bet is predicted from the exposed bet seed with the engine itself. The fixtures are never
 shipped in the playable build. Set `MINE_CHROMIUM` to use
 an installed Chromium and run one viewport per process with `MINE_SIZE`.
